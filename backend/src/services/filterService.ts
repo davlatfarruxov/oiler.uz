@@ -1,0 +1,183 @@
+import Filter, { IFilterDocument } from '../models/Filter';
+import Settings from '../models/Settings';
+import { ApiError } from '../utils/ApiError';
+import { FilterType } from '../types';
+
+interface CreateFilterData {
+  brandName: string;
+  filterType: FilterType;
+  partNumber: string;
+  quality: string;
+  compatibleVehicles: string[];
+  costPrice: number;
+  costCurrency: 'USD' | 'UZS';
+  price: number;
+  stock: number;
+  reorderLevel?: number;
+}
+
+interface UpdateFilterData {
+  brandName?: string;
+  filterType?: FilterType;
+  partNumber?: string;
+  quality?: string;
+  compatibleVehicles?: string[];
+  costPrice?: number;
+  costCurrency?: 'USD' | 'UZS';
+  price?: number;
+  stock?: number;
+  reorderLevel?: number;
+  active?: boolean;
+}
+
+export class FilterService {
+  async createFilter(data: CreateFilterData): Promise<IFilterDocument> {
+    let settings = await Settings.findOne();
+    if (!settings) {
+      settings = await Settings.create({});
+    }
+    const exchangeRate = settings.exchangeRate;
+
+    const existingFilter = await Filter.findOne({
+      brandName: data.brandName,
+      filterType: data.filterType,
+      partNumber: data.partNumber
+    });
+
+    if (existingFilter) {
+      throw new ApiError(400, 'Filter with these specifications already exists');
+    }
+
+    const filter = await Filter.create({
+      brandName: data.brandName,
+      filterType: data.filterType,
+      partNumber: data.partNumber,
+      quality: data.quality,
+      compatibleVehicles: data.compatibleVehicles,
+      costPrice: data.costPrice,
+      costCurrency: data.costCurrency,
+      exchangeRateUsed: exchangeRate,
+      price: data.price,
+      stock: data.stock,
+      reorderLevel: data.reorderLevel || 10
+    });
+
+    return filter;
+  }
+
+  async getAllFilters(activeOnly: boolean = false, filterType?: FilterType, brandName?: string): Promise<any[]> {
+    const filter: any = activeOnly ? { active: true } : {};
+    if (filterType) {
+      filter.filterType = filterType;
+    }
+    if (brandName) {
+      filter.brandName = { $regex: brandName, $options: 'i' };
+    }
+    
+    const filters = await Filter.find(filter)
+      .sort({ brandName: 1, filterType: 1, partNumber: 1 });
+    
+    return filters.map(f => ({
+      _id: f._id.toString(),
+      brandName: f.brandName,
+      filterType: f.filterType,
+      partNumber: f.partNumber,
+      quality: f.quality,
+      compatibleVehicles: f.compatibleVehicles,
+      costPrice: f.costPrice,
+      costCurrency: f.costCurrency,
+      exchangeRateUsed: f.exchangeRateUsed,
+      price: f.price,
+      stock: f.stock,
+      reorderLevel: f.reorderLevel,
+      active: f.active,
+      displayName: `${f.brandName} ${f.partNumber} (${f.quality})`
+    }));
+  }
+
+  async getFilterById(id: string): Promise<IFilterDocument> {
+    const filter = await Filter.findById(id);
+    if (!filter) {
+      throw new ApiError(404, 'Filter not found');
+    }
+    return filter;
+  }
+
+  async updateFilter(id: string, data: UpdateFilterData): Promise<IFilterDocument> {
+    const filter = await Filter.findById(id);
+    if (!filter) {
+      throw new ApiError(404, 'Filter not found');
+    }
+
+    if (data.brandName || data.filterType || data.partNumber) {
+      const checkData = {
+        brandName: data.brandName || filter.brandName,
+        filterType: data.filterType || filter.filterType,
+        partNumber: data.partNumber || filter.partNumber
+      };
+
+      const duplicate = await Filter.findOne({
+        ...checkData,
+        _id: { $ne: id }
+      });
+
+      if (duplicate) {
+        throw new ApiError(400, 'Filter with these specifications already exists');
+      }
+    }
+
+    if (data.brandName) filter.brandName = data.brandName;
+    if (data.filterType) filter.filterType = data.filterType;
+    if (data.partNumber) filter.partNumber = data.partNumber;
+    if (data.quality) filter.quality = data.quality;
+    if (data.compatibleVehicles) filter.compatibleVehicles = data.compatibleVehicles;
+    if (data.costPrice !== undefined) filter.costPrice = data.costPrice;
+    if (data.costCurrency) filter.costCurrency = data.costCurrency;
+    if (data.price !== undefined) filter.price = data.price;
+    if (data.stock !== undefined) filter.stock = data.stock;
+    if (data.reorderLevel !== undefined) filter.reorderLevel = data.reorderLevel;
+    if (data.active !== undefined) filter.active = data.active;
+    
+    if (data.costPrice !== undefined || data.costCurrency) {
+      const settings = await Settings.findOne();
+      if (settings) {
+        filter.exchangeRateUsed = settings.exchangeRate;
+      }
+    }
+
+    await filter.save();
+    return filter;
+  }
+
+  async deleteFilter(id: string): Promise<void> {
+    const filter = await Filter.findById(id);
+    if (!filter) {
+      throw new ApiError(404, 'Filter not found');
+    }
+    await filter.deleteOne();
+  }
+
+  async updateStock(id: string, quantity: number): Promise<IFilterDocument> {
+    const filter = await Filter.findById(id);
+    if (!filter) {
+      throw new ApiError(404, 'Filter not found');
+    }
+
+    filter.stock += quantity;
+    if (filter.stock < 0) {
+      throw new ApiError(400, 'Insufficient stock');
+    }
+
+    await filter.save();
+    return filter;
+  }
+
+  async getLowStockFilters(threshold: number = 10): Promise<IFilterDocument[]> {
+    return Filter.find({
+      active: true,
+      stock: { $lte: threshold }
+    })
+      .lean()
+      .sort({ stock: 1 });
+  }
+}
