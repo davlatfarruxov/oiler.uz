@@ -1,5 +1,6 @@
 import Vehicle, { IVehicleDocument } from '../models/Vehicle';
 import Customer from '../models/Customer';
+import OilChange from '../models/OilChange';
 import { ApiError } from '../utils/ApiError';
 import { EngineType } from '../types';
 
@@ -124,23 +125,61 @@ export class VehicleService {
       throw new ApiError(404, 'Vehicle not found');
     }
 
-    // Import OilChange here to avoid circular dependency
-    const OilChange = (await import('../models/OilChange')).default;
+    try {
+      // Get oil change history with safe population
+      const oilChanges = await OilChange.find({ vehicle: vehicleId })
+        .populate({
+          path: 'employees',
+          select: 'name commissionRate',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'employeeCommissions.employee',
+          select: 'name',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'oilProduct',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'oilFilter',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'airFilter',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'cabinFilter',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'fuelFilter',
+          options: { strictPopulate: false }
+        })
+        .populate({
+          path: 'additionalProducts.product',
+          options: { strictPopulate: false }
+        })
+        .sort({ createdAt: -1 })
+        .lean();
 
-    // Get oil change history
-    const oilChanges = await OilChange.find({ vehicle: vehicleId })
-      .populate('employees', 'name commissionRate')
-      .populate('employeeCommissions.employee', 'name')
-      .populate('oilProduct')
-      .populate('oilFilter')
-      .populate('additionalProducts.product')
-      .sort({ createdAt: -1 });
-
-    return {
-      vehicle,
-      oilChanges,
-      totalServices: oilChanges.length,
-      lastService: oilChanges[0] || null
-    };
+      return {
+        vehicle,
+        oilChanges,
+        totalServices: oilChanges.length,
+        lastService: oilChanges[0] || null
+      };
+    } catch (error: any) {
+      console.error('Error fetching vehicle history:', error);
+      // Return vehicle with empty history if populate fails
+      return {
+        vehicle,
+        oilChanges: [],
+        totalServices: 0,
+        lastService: null
+      };
+    }
   }
 }

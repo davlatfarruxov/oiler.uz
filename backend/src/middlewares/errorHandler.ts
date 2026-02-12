@@ -8,6 +8,17 @@ export const errorHandler = (
   res: Response,
   next: NextFunction
 ): void => {
+  // Log error for debugging
+  console.error('Error occurred:', {
+    name: err.name,
+    message: err.message,
+    stack: config.nodeEnv === 'development' ? err.stack : undefined,
+    url: req.url,
+    method: req.method,
+    body: req.body,
+    params: req.params
+  });
+
   let statusCode = 500;
   let message = 'Internal server error';
 
