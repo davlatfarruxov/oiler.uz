@@ -25,17 +25,20 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
   }
 };
 
-export const authorize = (roles: UserRole[]) => {
+export const authorize = (...roles: UserRole[]) => {
   return (req: AuthRequest, res: Response, next: NextFunction): void => {
     if (!req.user) {
       return next(new ApiError(401, 'Unauthorized'));
     }
 
-    console.log('User role:', req.user.role);
-    console.log('Required roles:', roles);
-    console.log('Role check:', roles.includes(req.user.role));
+    // Handle both array and spread arguments
+    const roleList = Array.isArray(roles[0]) ? roles[0] : roles;
 
-    if (!roles.includes(req.user.role)) {
+    console.log('User role:', req.user.role);
+    console.log('Required roles:', roleList);
+    console.log('Role check:', roleList.includes(req.user.role));
+
+    if (!roleList.includes(req.user.role)) {
       return next(new ApiError(403, 'Forbidden: Insufficient permissions'));
     }
 
