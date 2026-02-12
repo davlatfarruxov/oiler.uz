@@ -2,8 +2,9 @@ import { Response, NextFunction } from 'express';
 import { AuthRequest, UserRole } from '../types';
 import { verifyAccessToken } from '../utils/jwt';
 import { ApiError } from '../utils/ApiError';
+import Tenant from '../models/Tenant';
 
-export const authenticate = (req: AuthRequest, res: Response, next: NextFunction): void => {
+export const authenticate = async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
     const authHeader = req.headers.authorization;
 
@@ -14,14 +15,35 @@ export const authenticate = (req: AuthRequest, res: Response, next: NextFunction
     const token = authHeader.split(' ')[1];
     const decoded = verifyAccessToken(token);
 
+    // Verify tenant is active
+    const tenant = await Tenant.findById(decoded.tenantId);
+    if (!tenant) {
+      throw new ApiError(404, 'Tenant not found');
+    }
+
+    if (!tenant.isActive) {
+      throw new ApiError(403, 'Account is inactive. Please contact support.');
+    }
+
+    // Check if subscription is expired
+    if (tenant.expiresAt && new Date() > tenant.expiresAt) {
+      throw new ApiError(403, 'Subscription has expired. Please renew your subscription.');
+    }
+
     req.user = {
       id: decoded.id,
-      role: decoded.role
+      role: decoded.role,
+      tenantId: decoded.tenantId,
+      isTenantOwner: decoded.isTenantOwner
     };
 
     next();
   } catch (error) {
-    next(new ApiError(401, 'Invalid or expired token'));
+    if (error instanceof ApiError) {
+      next(error);
+    } else {
+      next(new ApiError(401, 'Invalid or expired token'));
+    }
   }
 };
 

@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { UserRole } from '../types';
 
 export interface IEmployeeDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   name: string;
   email: string;
   phone: string;
@@ -15,6 +16,12 @@ export interface IEmployeeDocument extends Document {
 
 const employeeSchema = new Schema<IEmployeeDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     name: {
       type: String,
       required: [true, 'Employee name is required'],
@@ -23,7 +30,6 @@ const employeeSchema = new Schema<IEmployeeDocument>(
     email: {
       type: String,
       required: [true, 'Email is required'],
-      unique: true,
       lowercase: true,
       trim: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
@@ -58,8 +64,12 @@ const employeeSchema = new Schema<IEmployeeDocument>(
   }
 );
 
-employeeSchema.index({ active: 1 });
-employeeSchema.index({ role: 1 });
-employeeSchema.index({ email: 1 });
+// Compound indexes for multi-tenant queries
+employeeSchema.index({ tenant: 1, active: 1 });
+employeeSchema.index({ tenant: 1, role: 1 });
+employeeSchema.index({ tenant: 1, createdAt: -1 });
+
+// Email should be unique per tenant
+employeeSchema.index({ tenant: 1, email: 1 }, { unique: true });
 
 export default mongoose.model<IEmployeeDocument>('Employee', employeeSchema);

@@ -32,6 +32,12 @@ export enum FilterType {
   FUEL_FILTER = 'fuel_filter'
 }
 
+export enum SubscriptionPlan {
+  FREE = 'free',
+  PREMIUM = 'premium',
+  ENTERPRISE = 'enterprise'
+}
+
 export interface IUser {
   _id: string;
   name: string;
@@ -47,5 +53,7 @@ export interface AuthRequest extends Request {
   user?: {
     id: string;
     role: UserRole;
+    tenantId: string;
+    isTenantOwner: boolean;
   };
 }

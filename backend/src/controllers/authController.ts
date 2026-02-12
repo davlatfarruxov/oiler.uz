@@ -20,6 +20,7 @@ export class AuthController {
 
       res.status(201).json(ApiResponse.success('Registration successful', {
         user: result.user,
+        tenant: result.tenant,
         accessToken: result.accessToken
       }));
     } catch (error) {
@@ -41,6 +42,7 @@ export class AuthController {
 
       res.status(200).json(ApiResponse.success('Login successful', {
         user: result.user,
+        tenant: result.tenant,
         accessToken: result.accessToken
       }));
     } catch (error) {

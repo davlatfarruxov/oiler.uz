@@ -2,9 +2,10 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { EngineType } from '../types';
 
 export interface IVehicleDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   plateNumber: string;
   brand: string;
-  model: string;
+  vehicleModel: string; // Renamed from 'model' to avoid conflict with Document.model()
   engineType: EngineType;
   customer: mongoose.Types.ObjectId;
   createdAt: Date;
@@ -13,20 +14,24 @@ export interface IVehicleDocument extends Document {
 
 const vehicleSchema = new Schema<IVehicleDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     plateNumber: {
       type: String,
       required: [true, 'Plate number is required'],
-      unique: true,
       uppercase: true,
-      trim: true,
-      index: true
+      trim: true
     },
     brand: {
       type: String,
       required: [true, 'Vehicle brand is required'],
       trim: true
     },
-    model: {
+    vehicleModel: {
       type: String,
       required: [true, 'Vehicle model is required'],
       trim: true
@@ -47,5 +52,13 @@ const vehicleSchema = new Schema<IVehicleDocument>(
     timestamps: true
   }
 );
+
+// Compound indexes for multi-tenant queries
+vehicleSchema.index({ tenant: 1, createdAt: -1 });
+vehicleSchema.index({ tenant: 1, customer: 1 });
+vehicleSchema.index({ tenant: 1, plateNumber: 1 });
+
+// Plate number should be unique per tenant
+vehicleSchema.index({ tenant: 1, plateNumber: 1 }, { unique: true });
 
 export default mongoose.model<IVehicleDocument>('Vehicle', vehicleSchema);

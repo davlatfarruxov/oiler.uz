@@ -5,6 +5,8 @@ import { UserRole } from '../types';
 export interface TokenPayload {
   id: string;
   role: UserRole;
+  tenantId: string;
+  isTenantOwner: boolean;
 }
 
 export const generateAccessToken = (payload: TokenPayload): string => {

@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface ICustomerDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   name: string;
   phone: string;
   vehicles: mongoose.Types.ObjectId[];
@@ -10,6 +11,12 @@ export interface ICustomerDocument extends Document {
 
 const customerSchema = new Schema<ICustomerDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     name: {
       type: String,
       required: [true, 'Customer name is required'],
@@ -18,8 +25,7 @@ const customerSchema = new Schema<ICustomerDocument>(
     phone: {
       type: String,
       required: [true, 'Phone number is required'],
-      trim: true,
-      index: true
+      trim: true
     },
     vehicles: [{
       type: Schema.Types.ObjectId,
@@ -30,5 +36,12 @@ const customerSchema = new Schema<ICustomerDocument>(
     timestamps: true
   }
 );
+
+// Compound indexes for multi-tenant queries
+customerSchema.index({ tenant: 1, createdAt: -1 });
+customerSchema.index({ tenant: 1, phone: 1 });
+
+// Phone should be unique per tenant
+customerSchema.index({ tenant: 1, phone: 1 }, { unique: true });
 
 export default mongoose.model<ICustomerDocument>('Customer', customerSchema);

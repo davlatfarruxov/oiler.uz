@@ -8,7 +8,10 @@
     "build": "tsc",
     "start": "node dist/server.js",
     "lint": "eslint . --ext .ts",
-    "test": "jest"
+    "test": "jest",
+    "migrate:create-tenant": "ts-node scripts/create-default-tenant.ts",
+    "migrate:users": "ts-node scripts/migrate-users-to-tenant.ts",
+    "migrate:core-models": "ts-node scripts/migrate-core-models.ts"
   },
   "keywords": ["oil-change", "service", "automation"],
   "author": "",

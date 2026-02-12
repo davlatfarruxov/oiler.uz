@@ -7,6 +7,8 @@ export interface IUserDocument extends Document {
   email: string;
   password: string;
   role: UserRole;
+  tenant: mongoose.Types.ObjectId;
+  isTenantOwner: boolean;
   isActive: boolean;
   // Notification Preferences
   emailNotifications: boolean;
@@ -28,11 +30,9 @@ const userSchema = new Schema<IUserDocument>(
     email: {
       type: String,
       required: [true, 'Email is required'],
-      unique: true,
       lowercase: true,
       trim: true,
-      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
-      index: true
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
     },
     password: {
       type: String,
@@ -44,6 +44,16 @@ const userSchema = new Schema<IUserDocument>(
       type: String,
       enum: Object.values(UserRole),
       default: UserRole.EMPLOYEE
+    },
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
+    isTenantOwner: {
+      type: Boolean,
+      default: false
     },
     isActive: {
       type: Boolean,
@@ -70,6 +80,11 @@ const userSchema = new Schema<IUserDocument>(
     timestamps: true
   }
 );
+
+// Compound unique index: email must be unique per tenant
+userSchema.index({ email: 1, tenant: 1 }, { unique: true });
+userSchema.index({ tenant: 1, role: 1 });
+userSchema.index({ tenant: 1, isActive: 1 });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
