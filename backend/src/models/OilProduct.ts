@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOilProduct extends Document {
+  tenant: mongoose.Types.ObjectId;
   brand: mongoose.Types.ObjectId; // Reference to OilBrand
   viscosity: string; // 10W-40, 5W-30, etc.
   apiGrade: string; // SN, SL, SP, etc.
@@ -18,6 +19,12 @@ export interface IOilProduct extends Document {
 
 const oilProductSchema = new Schema<IOilProduct>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     brand: {
       type: Schema.Types.ObjectId,
       ref: 'OilBrand',
@@ -81,9 +88,10 @@ const oilProductSchema = new Schema<IOilProduct>(
   }
 );
 
-// Index for faster queries
-oilProductSchema.index({ brand: 1, viscosity: 1, apiGrade: 1, volume: 1 });
-oilProductSchema.index({ active: 1 });
+// Compound indexes for multi-tenant queries
+oilProductSchema.index({ tenant: 1, createdAt: -1 });
+oilProductSchema.index({ tenant: 1, brand: 1, viscosity: 1, apiGrade: 1, volume: 1 });
+oilProductSchema.index({ tenant: 1, active: 1 });
 
 // Virtual for display name
 oilProductSchema.virtual('displayName').get(function() {

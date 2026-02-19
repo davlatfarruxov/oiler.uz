@@ -1,12 +1,12 @@
 import { Router } from 'express';
-import { ServiceController } from '../controllers/serviceController';
+import { AppointmentServiceController } from '../controllers/appointmentServiceController';
 import { authenticate, authorize } from '../middlewares/auth';
 import { validate } from '../middlewares/validate';
 import { body } from 'express-validator';
 import { UserRole } from '../types';
 
 const router = Router();
-const serviceController = new ServiceController();
+const serviceController = new AppointmentServiceController();
 
 const serviceValidation = [
   body('name').notEmpty().withMessage('Service name is required'),

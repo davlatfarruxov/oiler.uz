@@ -4,6 +4,7 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import compression from 'compression';
 import cookieParser from 'cookie-parser';
+import rateLimit from 'express-rate-limit';
 import { config } from './config/env';
 import { connectDatabase } from './config/database';
 import { errorHandler } from './middlewares/errorHandler';
@@ -22,8 +23,20 @@ app.use(cors({
 // Cookie parser
 app.use(cookieParser());
 
-// Rate limiting
-app.use('/api', generalRateLimiter);
+// Rate limiting - more lenient in development
+if (config.nodeEnv === 'production') {
+  app.use('/api', generalRateLimiter);
+} else {
+  // Development: very high limits to avoid blocking during testing
+  const devRateLimiter = rateLimit({
+    windowMs: 60 * 1000, // 1 minute
+    max: 1000, // 1000 requests per minute in dev
+    message: 'Too many requests from this IP, please try again later',
+    standardHeaders: true,
+    legacyHeaders: false
+  });
+  app.use('/api', devRateLimiter);
+}
 
 // Body parsing
 app.use(express.json({ limit: '10mb' }));

@@ -1,6 +1,7 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useTenant } from '@/lib/contexts/TenantContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -8,31 +9,115 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { AlertCircle, Bell, Lock, Users } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
+import { AlertCircle, Bell, Lock, Users, Building2, CreditCard, Loader2 } from 'lucide-react'
+import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function SettingsPage() {
-  const [companyName, setCompanyName] = useState('OilServe Pro')
-  const [email, setEmail] = useState('admin@oilserve.com')
-  const [phone, setPhone] = useState('555-0000')
-  const [address, setAddress] = useState('123 Service Ave, Mechanic City, MC 12345')
-  const [exchangeRate, setExchangeRate] = useState('12500')
+  const { tenant, isLoading: tenantLoading, updateTenant } = useTenant()
   
+  // Company Info State
+  const [companyName, setCompanyName] = useState('')
+  const [businessEmail, setBusinessEmail] = useState('')
+  const [businessPhone, setBusinessPhone] = useState('')
+  const [address, setAddress] = useState('')
+  const [exchangeRate, setExchangeRate] = useState('12500')
+  const [isSaving, setIsSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState<{ type: 'success' | 'error', text: string } | null>(null)
+  
+  // Notification State
   const [emailNotifications, setEmailNotifications] = useState(true)
   const [smsNotifications, setSmsNotifications] = useState(false)
   const [lowStockAlerts, setLowStockAlerts] = useState(true)
   const [dailyReport, setDailyReport] = useState(true)
 
-  const handleSaveCompanyInfo = () => {
-    // Save company info
+  // Load tenant data and settings
+  useEffect(() => {
+    const loadSettings = async () => {
+      if (tenant) {
+        setCompanyName(tenant.companyName || '')
+        setBusinessEmail(tenant.businessEmail || '')
+        setBusinessPhone(tenant.businessPhone || '')
+        setAddress(tenant.address || '')
+        
+        // Load exchange rate from settings
+        try {
+          const api = (await import('@/lib/api/axios')).default
+          const response = await api.get('/settings')
+          if (response.data?.data?.exchangeRate) {
+            setExchangeRate(String(response.data.data.exchangeRate))
+          }
+        } catch (error) {
+          console.error('Failed to load settings:', error)
+        }
+      }
+    }
+    
+    loadSettings()
+  }, [tenant])
+
+  const handleSaveCompanyInfo = async () => {
+    try {
+      setIsSaving(true)
+      setSaveMessage(null)
+      
+      await updateTenant({
+        companyName,
+        businessEmail,
+        businessPhone,
+        address
+      })
+      
+      setSaveMessage({ type: 'success', text: 'Company information updated successfully!' })
+    } catch (error: any) {
+      setSaveMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to update company information' 
+      })
+    } finally {
+      setIsSaving(false)
+    }
   }
 
   const handleUpdateExchangeRate = async () => {
+    setIsSaving(true)
+    setSaveMessage(null)
+    
     try {
+      const rateValue = Number(exchangeRate)
+      
+      if (isNaN(rateValue) || rateValue <= 0) {
+        setSaveMessage({ 
+          type: 'error', 
+          text: 'Please enter a valid exchange rate (positive number)' 
+        })
+        return
+      }
+      
       const api = (await import('@/lib/api/axios')).default
-      await api.put('/settings/exchange-rate', { exchangeRate: Number(exchangeRate) })
-      alert('Exchange rate updated successfully!')
+      const response = await api.put('/settings/exchange-rate', { exchangeRate: rateValue })
+      
+      setSaveMessage({ type: 'success', text: 'Exchange rate updated successfully!' })
+      
+      // Auto-hide success message after 3 seconds
+      setTimeout(() => setSaveMessage(null), 3000)
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update exchange rate')
+      console.error('Exchange rate update error:', error)
+      setSaveMessage({ 
+        type: 'error', 
+        text: error.response?.data?.message || 'Failed to update exchange rate' 
+      })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const getPlanBadgeColor = (plan: string) => {
+    switch (plan?.toLowerCase()) {
+      case 'free': return 'secondary'
+      case 'premium': return 'default'
+      case 'enterprise': return 'default'
+      default: return 'secondary'
     }
   }
 
@@ -48,8 +133,12 @@ export default function SettingsPage() {
       <Tabs defaultValue="company" className="space-y-4">
         <TabsList>
           <TabsTrigger value="company" className="gap-2">
-            <Users className="w-4 h-4" />
+            <Building2 className="w-4 h-4" />
             Company
+          </TabsTrigger>
+          <TabsTrigger value="subscription" className="gap-2">
+            <CreditCard className="w-4 h-4" />
+            Subscription
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="w-4 h-4" />
@@ -63,46 +152,73 @@ export default function SettingsPage() {
 
         {/* Company Settings */}
         <TabsContent value="company" className="space-y-4">
+          {saveMessage && (
+            <Alert variant={saveMessage.type === 'error' ? 'destructive' : 'default'}>
+              <AlertDescription>{saveMessage.text}</AlertDescription>
+            </Alert>
+          )}
+          
           <Card>
             <CardHeader>
               <CardTitle>Business Information</CardTitle>
-              <CardDescription>Update your business details</CardDescription>
+              <CardDescription>Update your business details and contact information</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <div>
-                <Label htmlFor="company">Company Name</Label>
-                <Input
-                  id="company"
-                  value={companyName}
-                  onChange={(e) => setCompanyName(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="businessEmail">Business Email</Label>
-                <Input
-                  id="businessEmail"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="businessPhone">Business Phone</Label>
-                <Input
-                  id="businessPhone"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                />
-              </div>
-              <div>
-                <Label htmlFor="address">Address</Label>
-                <Input
-                  id="address"
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                />
-              </div>
-              <Button onClick={handleSaveCompanyInfo}>Save Changes</Button>
+              {tenantLoading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <>
+                  <div>
+                    <Label htmlFor="company">Company Name</Label>
+                    <Input
+                      id="company"
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Your Company Name"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="businessEmail">Business Email</Label>
+                    <Input
+                      id="businessEmail"
+                      type="email"
+                      value={businessEmail}
+                      onChange={(e) => setBusinessEmail(e.target.value)}
+                      placeholder="info@company.com"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="businessPhone">Business Phone</Label>
+                    <Input
+                      id="businessPhone"
+                      value={businessPhone}
+                      onChange={(e) => setBusinessPhone(e.target.value)}
+                      placeholder="+998 90 123 45 67"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="address">Address</Label>
+                    <Input
+                      id="address"
+                      value={address}
+                      onChange={(e) => setAddress(e.target.value)}
+                      placeholder="123 Main St, Tashkent"
+                    />
+                  </div>
+                  <Button onClick={handleSaveCompanyInfo} disabled={isSaving}>
+                    {isSaving ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Saving...
+                      </>
+                    ) : (
+                      'Save Changes'
+                    )}
+                  </Button>
+                </>
+              )}
             </CardContent>
           </Card>
 
@@ -157,7 +273,72 @@ export default function SettingsPage() {
                   This rate is used when adding products with USD cost price
                 </p>
               </div>
-              <Button onClick={handleUpdateExchangeRate}>Update Exchange Rate</Button>
+              <Button 
+                onClick={handleUpdateExchangeRate} 
+                disabled={isSaving}
+              >
+                {isSaving ? 'Updating...' : 'Update Exchange Rate'}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Subscription Tab */}
+        <TabsContent value="subscription" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Current Plan</CardTitle>
+              <CardDescription>View your subscription details and limits</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Plan Type</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-2xl font-bold capitalize">{tenant?.plan || 'Free'}</p>
+                    <Badge variant={getPlanBadgeColor(tenant?.plan || 'free')}>
+                      {tenant?.isActive ? 'Active' : 'Inactive'}
+                    </Badge>
+                  </div>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Max Employees</p>
+                  <p className="text-xl font-semibold">
+                    {tenant?.maxEmployees === -1 ? 'Unlimited' : tenant?.maxEmployees || 5}
+                  </p>
+                </div>
+                <div className="space-y-1">
+                  <p className="text-sm font-medium text-muted-foreground">Max Vehicles</p>
+                  <p className="text-xl font-semibold">
+                    {tenant?.maxVehicles === -1 ? 'Unlimited' : tenant?.maxVehicles || 100}
+                  </p>
+                </div>
+              </div>
+
+              {tenant?.expiresAt && (
+                <div className="pt-4 border-t">
+                  <p className="text-sm font-medium text-muted-foreground">Expires At</p>
+                  <p className="text-lg font-semibold mt-1">
+                    {new Date(tenant.expiresAt).toLocaleDateString('en-US', {
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    })}
+                  </p>
+                </div>
+              )}
+
+              <div className="pt-4 border-t">
+                <p className="text-sm text-muted-foreground mb-4">
+                  Want to upgrade your plan? Contact support for more information.
+                </p>
+                <Button variant="outline" disabled>
+                  Upgrade Plan (Coming Soon)
+                </Button>
+              </div>
             </CardContent>
           </Card>
         </TabsContent>

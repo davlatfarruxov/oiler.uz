@@ -13,24 +13,30 @@ interface UpdateOilBrandData {
 }
 
 export class OilBrandService {
-  async createOilBrand(data: CreateOilBrandData): Promise<IOilBrand> {
-    const existingBrand = await OilBrand.findOne({ name: data.name });
+  async createOilBrand(tenantId: string, data: CreateOilBrandData): Promise<IOilBrand> {
+    const existingBrand = await OilBrand.findOne({ tenant: tenantId, name: data.name });
     
     if (existingBrand) {
       throw new ApiError(400, 'Brand already exists');
     }
 
-    const brand = await OilBrand.create(data);
+    const brand = await OilBrand.create({
+      tenant: tenantId,
+      ...data
+    });
     return brand;
   }
 
-  async getAllOilBrands(activeOnly: boolean = false): Promise<IOilBrand[]> {
-    const filter = activeOnly ? { active: true } : {};
+  async getAllOilBrands(tenantId: string, activeOnly: boolean = false): Promise<IOilBrand[]> {
+    const filter: any = { tenant: tenantId };
+    if (activeOnly) {
+      filter.active = true;
+    }
     return OilBrand.find(filter).sort({ name: 1 });
   }
 
-  async getOilBrandById(id: string): Promise<IOilBrand> {
-    const brand = await OilBrand.findById(id);
+  async getOilBrandById(tenantId: string, id: string): Promise<IOilBrand> {
+    const brand = await OilBrand.findOne({ _id: id, tenant: tenantId });
     
     if (!brand) {
       throw new ApiError(404, 'Brand not found');
@@ -39,15 +45,15 @@ export class OilBrandService {
     return brand;
   }
 
-  async updateOilBrand(id: string, data: UpdateOilBrandData): Promise<IOilBrand> {
-    const brand = await OilBrand.findById(id);
+  async updateOilBrand(tenantId: string, id: string, data: UpdateOilBrandData): Promise<IOilBrand> {
+    const brand = await OilBrand.findOne({ _id: id, tenant: tenantId });
     
     if (!brand) {
       throw new ApiError(404, 'Brand not found');
     }
 
     if (data.name && data.name !== brand.name) {
-      const duplicate = await OilBrand.findOne({ name: data.name, _id: { $ne: id } });
+      const duplicate = await OilBrand.findOne({ tenant: tenantId, name: data.name, _id: { $ne: id } });
       if (duplicate) {
         throw new ApiError(400, 'Brand name already exists');
       }
@@ -59,8 +65,8 @@ export class OilBrandService {
     return brand;
   }
 
-  async deleteOilBrand(id: string): Promise<void> {
-    const brand = await OilBrand.findById(id);
+  async deleteOilBrand(tenantId: string, id: string): Promise<void> {
+    const brand = await OilBrand.findOne({ _id: id, tenant: tenantId });
     
     if (!brand) {
       throw new ApiError(404, 'Brand not found');

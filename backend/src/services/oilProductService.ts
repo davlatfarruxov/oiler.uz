@@ -29,22 +29,23 @@ interface UpdateOilProductData {
 }
 
 export class OilProductService {
-  async createOilProduct(data: CreateOilProductData): Promise<IOilProduct> {
-    // Check if brand exists
-    const brand = await OilBrand.findById(data.brandId);
+  async createOilProduct(tenantId: string, data: CreateOilProductData): Promise<IOilProduct> {
+    // Check if brand exists and belongs to tenant
+    const brand = await OilBrand.findOne({ _id: data.brandId, tenant: tenantId });
     if (!brand) {
       throw new ApiError(404, 'Brand not found');
     }
 
-    // Get current exchange rate from settings
-    let settings = await Settings.findOne();
+    // Get current exchange rate from tenant settings
+    let settings = await Settings.findOne({ tenant: tenantId });
     if (!settings) {
-      settings = await Settings.create({});
+      settings = await Settings.create({ tenant: tenantId });
     }
     const exchangeRate = settings.exchangeRate;
 
-    // Check if product already exists
+    // Check if product already exists for this tenant
     const existingProduct = await OilProduct.findOne({
+      tenant: tenantId,
       brand: data.brandId,
       viscosity: data.viscosity,
       apiGrade: data.apiGrade,
@@ -56,6 +57,7 @@ export class OilProductService {
     }
 
     const oilProduct = await OilProduct.create({
+      tenant: tenantId,
       brand: data.brandId,
       viscosity: data.viscosity,
       apiGrade: data.apiGrade,
@@ -71,8 +73,11 @@ export class OilProductService {
     return oilProduct.populate('brand');
   }
 
-  async getAllOilProducts(activeOnly: boolean = false, brandId?: string): Promise<any[]> {
-    const filter: any = activeOnly ? { active: true } : {};
+  async getAllOilProducts(tenantId: string, activeOnly: boolean = false, brandId?: string): Promise<any[]> {
+    const filter: any = { tenant: tenantId };
+    if (activeOnly) {
+      filter.active = true;
+    }
     if (brandId) {
       filter.brand = brandId;
     }
@@ -81,13 +86,14 @@ export class OilProductService {
       .populate('brand', 'name _id')
       .sort({ brand: 1, viscosity: 1, volume: 1 });
     
-    // Convert to plain objects manually
+    // Convert to plain objects with brand as string
     return products.map(p => {
-      const brandName = (p.brand as any)?.name || 'Unknown';
+      const brand = p.brand as any;
+      const brandName = brand?.name || 'Unknown';
       return {
         _id: p._id.toString(),
-        brand: brandName,
-        brandId: (p.brand as any)?._id?.toString(),
+        brand: brandName, // Return as string, not object
+        brandId: brand?._id?.toString(),
         viscosity: p.viscosity,
         apiGrade: p.apiGrade,
         volume: p.volume,
@@ -103,8 +109,8 @@ export class OilProductService {
     });
   }
 
-  async getOilProductById(id: string): Promise<IOilProduct> {
-    const oilProduct = await OilProduct.findById(id).populate('brand');
+  async getOilProductById(tenantId: string, id: string): Promise<IOilProduct> {
+    const oilProduct = await OilProduct.findOne({ _id: id, tenant: tenantId }).populate('brand');
     
     if (!oilProduct) {
       throw new ApiError(404, 'Oil product not found');
@@ -113,24 +119,25 @@ export class OilProductService {
     return oilProduct;
   }
 
-  async updateOilProduct(id: string, data: UpdateOilProductData): Promise<IOilProduct> {
-    const oilProduct = await OilProduct.findById(id);
+  async updateOilProduct(tenantId: string, id: string, data: UpdateOilProductData): Promise<IOilProduct> {
+    const oilProduct = await OilProduct.findOne({ _id: id, tenant: tenantId });
     
     if (!oilProduct) {
       throw new ApiError(404, 'Oil product not found');
     }
 
-    // If updating brand, check if it exists
+    // If updating brand, check if it exists and belongs to tenant
     if (data.brandId) {
-      const brand = await OilBrand.findById(data.brandId);
+      const brand = await OilBrand.findOne({ _id: data.brandId, tenant: tenantId });
       if (!brand) {
         throw new ApiError(404, 'Brand not found');
       }
     }
 
-    // If updating specifications, check for duplicates
+    // If updating specifications, check for duplicates within tenant
     if (data.brandId || data.viscosity || data.apiGrade || data.volume) {
       const checkData = {
+        tenant: tenantId,
         brand: data.brandId || oilProduct.brand,
         viscosity: data.viscosity || oilProduct.viscosity,
         apiGrade: data.apiGrade || oilProduct.apiGrade,
@@ -162,7 +169,7 @@ export class OilProductService {
     
     // Update exchange rate if cost currency or price changed
     if (data.costPrice !== undefined || data.costCurrency) {
-      const settings = await Settings.findOne();
+      const settings = await Settings.findOne({ tenant: tenantId });
       if (settings) {
         oilProduct.exchangeRateUsed = settings.exchangeRate;
       }
@@ -173,8 +180,8 @@ export class OilProductService {
     return oilProduct.populate('brand');
   }
 
-  async deleteOilProduct(id: string): Promise<void> {
-    const oilProduct = await OilProduct.findById(id);
+  async deleteOilProduct(tenantId: string, id: string): Promise<void> {
+    const oilProduct = await OilProduct.findOne({ _id: id, tenant: tenantId });
     
     if (!oilProduct) {
       throw new ApiError(404, 'Oil product not found');
@@ -183,8 +190,8 @@ export class OilProductService {
     await oilProduct.deleteOne();
   }
 
-  async updateStock(id: string, quantity: number): Promise<IOilProduct> {
-    const oilProduct = await OilProduct.findById(id);
+  async updateStock(tenantId: string, id: string, quantity: number): Promise<IOilProduct> {
+    const oilProduct = await OilProduct.findOne({ _id: id, tenant: tenantId });
     
     if (!oilProduct) {
       throw new ApiError(404, 'Oil product not found');
@@ -200,8 +207,9 @@ export class OilProductService {
     return oilProduct;
   }
 
-  async getLowStockProducts(threshold: number = 10): Promise<IOilProduct[]> {
+  async getLowStockProducts(tenantId: string, threshold: number = 10): Promise<IOilProduct[]> {
     return OilProduct.find({
+      tenant: tenantId,
       active: true,
       stock: { $lte: threshold }
     })

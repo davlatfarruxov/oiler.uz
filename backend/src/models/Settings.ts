@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface ISettings extends Document {
+  tenant: mongoose.Types.ObjectId;
   // Company Information
   companyName: string;
   businessEmail: string;
@@ -24,6 +25,13 @@ export interface ISettings extends Document {
 
 const settingsSchema = new Schema<ISettings>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      unique: true, // Each tenant can have only one settings document
+      index: true
+    },
     companyName: {
       type: String,
       required: true,

@@ -1,77 +1,116 @@
-import { Request, Response, NextFunction } from 'express';
+import { Response, NextFunction } from 'express';
 import { EmployeeService } from '../services/employeeService';
 import { ApiResponse } from '../utils/ApiResponse';
+import { AuthRequest } from '../types';
 
 const employeeService = new EmployeeService();
 
 export class EmployeeController {
-  async createEmployee(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async createEmployee(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const employee = await employeeService.createEmployee(req.body);
+      const tenantId = req.user!.tenantId;
+      const employee = await employeeService.createEmployee(tenantId, req.body);
       res.status(201).json(ApiResponse.success('Employee created successfully', employee));
     } catch (error) {
       next(error);
     }
   }
 
-  async getAllEmployees(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getAllEmployees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const employees = await employeeService.getAllEmployeesWithStats();
+      const tenantId = req.user!.tenantId;
+      const employees = await employeeService.getAllEmployeesWithStats(tenantId);
       res.status(200).json(ApiResponse.success('Employees retrieved', employees));
     } catch (error) {
       next(error);
     }
   }
 
-  async getEmployeeById(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getEmployeeById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const employee = await employeeService.getEmployeeWithPerformance(req.params.id);
+      const tenantId = req.user!.tenantId;
+      const employee = await employeeService.getEmployeeWithPerformance(tenantId, req.params.id);
       res.status(200).json(ApiResponse.success('Employee retrieved', employee));
     } catch (error) {
       next(error);
     }
   }
 
-  async getEmployeeStats(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getEmployeeStats(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const stats = await employeeService.getEmployeeStats();
+      const tenantId = req.user!.tenantId;
+      const stats = await employeeService.getEmployeeStats(tenantId);
       res.status(200).json(ApiResponse.success('Employee statistics retrieved', stats));
     } catch (error) {
       next(error);
     }
   }
 
-  async getEmployeePerformance(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async getEmployeePerformance(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const performance = await employeeService.getEmployeePerformance(req.params.id);
+      const tenantId = req.user!.tenantId;
+      const performance = await employeeService.getEmployeePerformance(tenantId, req.params.id);
       res.status(200).json(ApiResponse.success('Employee performance retrieved', performance));
     } catch (error) {
       next(error);
     }
   }
 
-  async updateEmployee(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async updateEmployee(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const employee = await employeeService.updateEmployee(req.params.id, req.body);
+      const tenantId = req.user!.tenantId;
+      const employee = await employeeService.updateEmployee(tenantId, req.params.id, req.body);
       res.status(200).json(ApiResponse.success('Employee updated successfully', employee));
     } catch (error) {
       next(error);
     }
   }
 
-  async toggleEmployeeStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async toggleEmployeeStatus(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const employee = await employeeService.toggleEmployeeStatus(req.params.id);
+      const tenantId = req.user!.tenantId;
+      const employee = await employeeService.toggleEmployeeStatus(tenantId, req.params.id);
       res.status(200).json(ApiResponse.success('Employee status toggled', employee));
     } catch (error) {
       next(error);
     }
   }
 
-  async deleteEmployee(req: Request, res: Response, next: NextFunction): Promise<void> {
+  async deleteEmployee(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      await employeeService.deleteEmployee(req.params.id);
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.id;
+      const { reason } = req.body;
+      await employeeService.archiveEmployee(tenantId, req.params.id, userId, reason);
       res.status(200).json(ApiResponse.success('Employee deleted successfully'));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getArchivedEmployees(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 100;
+      
+      const result = await employeeService.getArchivedEmployees(tenantId, page, limit);
+      res.status(200).json(ApiResponse.success('Archived employees retrieved', result.data, {
+        page: result.page,
+        limit: result.limit,
+        totalPages: result.totalPages,
+        totalItems: result.totalItems
+      }));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async restoreEmployee(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const employee = await employeeService.restoreEmployee(tenantId, req.params.id);
+      res.status(200).json(ApiResponse.success('Employee restored successfully', employee));
     } catch (error) {
       next(error);
     }

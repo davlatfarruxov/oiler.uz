@@ -205,8 +205,8 @@ export default function OilChangesPage() {
                         <p className="font-semibold text-foreground">
                           {service.vehicle?.plateNumber || 'N/A'}
                         </p>
-                        <Badge variant="outline">{service.oilType.replace('_', ' ').toUpperCase()}</Badge>
-                        <Badge variant="outline">{service.oilQuantity}L</Badge>
+                        <Badge variant="outline">{service.oilType?.replace('_', ' ').toUpperCase() || 'N/A'}</Badge>
+                        <Badge variant="outline">{service.oilQuantity ? `${service.oilQuantity}L` : 'N/A'}</Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         Customer: {service.customer?.name || 'N/A'} • Mileage: {service.mileage} km
@@ -242,7 +242,7 @@ export default function OilChangesPage() {
                 <PopoverTrigger asChild>
                   <Button variant="outline" className="w-full justify-start gap-2 bg-transparent mt-2">
                     <Search className="w-4 h-4" />
-                    {selectedVehicle ? `${selectedVehicle.plateNumber} - ${selectedVehicle.brand} ${selectedVehicle.model}` : 'Search vehicle...'}
+                    {selectedVehicle ? `${selectedVehicle.plateNumber} - ${selectedVehicle.brand} ${selectedVehicle.vehicleModel}` : 'Search vehicle...'}
                   </Button>
                 </PopoverTrigger>
                 <PopoverContent className="w-full p-0">
@@ -254,7 +254,7 @@ export default function OilChangesPage() {
                         {vehicles.map((vehicle) => (
                           <CommandItem key={vehicle._id} onSelect={() => handleVehicleSelect(vehicle)}>
                             <Check className={cn('w-4 h-4 mr-2', selectedVehicle?._id === vehicle._id ? 'opacity-100' : 'opacity-0')} />
-                            {vehicle.plateNumber} - {vehicle.brand} {vehicle.model}
+                            {vehicle.plateNumber} - {vehicle.brand} {vehicle.vehicleModel}
                           </CommandItem>
                         ))}
                       </CommandGroup>
@@ -270,7 +270,7 @@ export default function OilChangesPage() {
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
                     <p className="text-muted-foreground">Brand/Model</p>
-                    <p className="font-medium text-foreground">{selectedVehicle.brand} {selectedVehicle.model}</p>
+                    <p className="font-medium text-foreground">{selectedVehicle.brand} {selectedVehicle.vehicleModel}</p>
                   </div>
                   <div>
                     <p className="text-muted-foreground">Engine</p>

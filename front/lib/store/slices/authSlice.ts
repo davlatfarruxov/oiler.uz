@@ -6,10 +6,23 @@ interface User {
   name: string;
   email: string;
   role: string;
+  tenantId?: string;
+  isTenantOwner?: boolean;
+}
+
+interface Tenant {
+  id: string;
+  companyName: string;
+  businessEmail: string;
+  businessPhone: string;
+  address?: string;
+  plan: string;
+  isActive: boolean;
 }
 
 interface AuthState {
   user: User | null;
+  tenant: Tenant | null;
   accessToken: string | null;
   isLoading: boolean;
   error: string | null;
@@ -18,8 +31,10 @@ interface AuthState {
 const getInitialState = (): AuthState => {
   if (typeof window !== 'undefined') {
     const token = localStorage.getItem('accessToken');
+    const tenantData = localStorage.getItem('tenant');
     return {
       user: null,
+      tenant: tenantData ? JSON.parse(tenantData) : null,
       accessToken: token,
       isLoading: false,
       error: null
@@ -27,6 +42,7 @@ const getInitialState = (): AuthState => {
   }
   return {
     user: null,
+    tenant: null,
     accessToken: null,
     isLoading: false,
     error: null
@@ -37,7 +53,15 @@ const initialState: AuthState = getInitialState();
 
 export const register = createAsyncThunk(
   'auth/register',
-  async (data: { name: string; email: string; password: string }) => {
+  async (data: { 
+    name: string; 
+    email: string; 
+    password: string;
+    companyName: string;
+    businessEmail: string;
+    businessPhone: string;
+    address?: string;
+  }) => {
     const response = await api.post('/auth/register', data);
     return response.data.data;
   }
@@ -66,16 +90,22 @@ const authSlice = createSlice({
   reducers: {
     logout: (state) => {
       state.user = null;
+      state.tenant = null;
       state.accessToken = null;
       if (typeof window !== 'undefined') {
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('tenant');
       }
     },
-    setCredentials: (state, action: PayloadAction<{ user: User; accessToken: string }>) => {
+    setCredentials: (state, action: PayloadAction<{ user: User; tenant?: Tenant; accessToken: string }>) => {
       state.user = action.payload.user;
+      state.tenant = action.payload.tenant || null;
       state.accessToken = action.payload.accessToken;
       if (typeof window !== 'undefined') {
         localStorage.setItem('accessToken', action.payload.accessToken);
+        if (action.payload.tenant) {
+          localStorage.setItem('tenant', JSON.stringify(action.payload.tenant));
+        }
       }
     }
   },
@@ -88,9 +118,13 @@ const authSlice = createSlice({
       .addCase(register.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
+        state.tenant = action.payload.tenant;
         state.accessToken = action.payload.accessToken;
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', action.payload.accessToken);
+          if (action.payload.tenant) {
+            localStorage.setItem('tenant', JSON.stringify(action.payload.tenant));
+          }
         }
       })
       .addCase(register.rejected, (state, action) => {
@@ -104,9 +138,13 @@ const authSlice = createSlice({
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false;
         state.user = action.payload.user;
+        state.tenant = action.payload.tenant;
         state.accessToken = action.payload.accessToken;
         if (typeof window !== 'undefined') {
           localStorage.setItem('accessToken', action.payload.accessToken);
+          if (action.payload.tenant) {
+            localStorage.setItem('tenant', JSON.stringify(action.payload.tenant));
+          }
         }
       })
       .addCase(login.rejected, (state, action) => {
@@ -118,9 +156,11 @@ const authSlice = createSlice({
       })
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;
+        state.tenant = null;
         state.accessToken = null;
         if (typeof window !== 'undefined') {
           localStorage.removeItem('accessToken');
+          localStorage.removeItem('tenant');
         }
       });
   }

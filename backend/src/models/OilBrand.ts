@@ -1,6 +1,7 @@
 import mongoose, { Document, Schema } from 'mongoose';
 
 export interface IOilBrand extends Document {
+  tenant: mongoose.Types.ObjectId;
   name: string;
   description?: string;
   active: boolean;
@@ -10,10 +11,15 @@ export interface IOilBrand extends Document {
 
 const oilBrandSchema = new Schema<IOilBrand>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     name: {
       type: String,
       required: [true, 'Brand name is required'],
-      unique: true,
       trim: true
     },
     description: {
@@ -30,6 +36,8 @@ const oilBrandSchema = new Schema<IOilBrand>(
   }
 );
 
-oilBrandSchema.index({ name: 1 });
+// Compound indexes for multi-tenant queries
+oilBrandSchema.index({ tenant: 1, createdAt: -1 });
+oilBrandSchema.index({ tenant: 1, name: 1 }, { unique: true });
 
 export default mongoose.model<IOilBrand>('OilBrand', oilBrandSchema);

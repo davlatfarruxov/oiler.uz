@@ -10,6 +10,9 @@ export interface IEmployeeDocument extends Document {
   commissionRate: number; // Percentage from labor cost (1-100)
   active: boolean;
   startDate: Date;
+  isArchived: boolean;
+  archivedAt?: Date;
+  archivedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -57,6 +60,18 @@ const employeeSchema = new Schema<IEmployeeDocument>(
     startDate: {
       type: Date,
       default: Date.now
+    },
+    isArchived: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    archivedAt: {
+      type: Date
+    },
+    archivedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     }
   },
   {

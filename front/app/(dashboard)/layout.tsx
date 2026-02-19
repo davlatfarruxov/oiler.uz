@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks'
 import { logoutUser, getProfile } from '@/lib/store/slices/authSlice'
+import { TenantProvider, useTenant } from '@/lib/contexts/TenantContext'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import {
@@ -21,13 +22,17 @@ import {
   X,
   LogOut,
   Loader2,
+  Building2,
+  Archive,
 } from 'lucide-react'
+import { Toaster } from 'sonner'
 
 const sidebarItems = [
   { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
   { name: 'Service', href: '/dashboard/service', icon: Wrench },
   { name: 'Employees', href: '/dashboard/employees', icon: Users },
   { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
+  { name: 'Archive', href: '/dashboard/archives', icon: Archive },
   { name: 'Settings', href: '/dashboard/settings', icon: Settings },
 ]
 
@@ -36,11 +41,20 @@ export default function DashboardLayout({
 }: {
   children: React.ReactNode
 }) {
+  return (
+    <TenantProvider>
+      <DashboardContent>{children}</DashboardContent>
+    </TenantProvider>
+  );
+}
+
+function DashboardContent({ children }: { children: React.ReactNode }) {
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const pathname = usePathname()
   const router = useRouter()
   const dispatch = useAppDispatch()
   const { user, accessToken, isLoading } = useAppSelector((state) => state.auth)
+  const { tenant } = useTenant()
 
   useEffect(() => {
     if (!accessToken) {
@@ -83,8 +97,20 @@ export default function DashboardLayout({
       >
         {/* Logo Area */}
         <div className="h-16 flex items-center justify-between px-4 border-b border-sidebar-border">
-          {sidebarOpen && (
-            <h1 className="font-bold text-lg text-sidebar-foreground">OilServe</h1>
+          {sidebarOpen ? (
+            <div className="flex items-center gap-2">
+              <Building2 className="w-5 h-5 text-sidebar-foreground" />
+              <div className="flex flex-col">
+                <h1 className="font-bold text-sm text-sidebar-foreground">
+                  {tenant?.companyName || 'OilServe'}
+                </h1>
+                <span className="text-xs text-sidebar-foreground/60 capitalize">
+                  {tenant?.plan || 'Free'} Plan
+                </span>
+              </div>
+            </div>
+          ) : (
+            <Building2 className="w-5 h-5 text-sidebar-foreground" />
           )}
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
@@ -151,7 +177,14 @@ export default function DashboardLayout({
                 <Menu className="w-5 h-5" />
               )}
             </button>
-            <h2 className="text-lg font-semibold text-foreground">Admin Panel</h2>
+            <div className="flex flex-col">
+              <h2 className="text-lg font-semibold text-foreground">
+                {tenant?.companyName || 'Admin Panel'}
+              </h2>
+              {tenant?.businessEmail && (
+                <span className="text-xs text-muted-foreground">{tenant.businessEmail}</span>
+              )}
+            </div>
           </div>
           <div className="flex items-center gap-4">
             <div className="hidden sm:flex flex-col items-end">
@@ -171,6 +204,7 @@ export default function DashboardLayout({
           <div className="p-6">{children}</div>
         </main>
       </div>
+      <Toaster position="top-right" richColors />
     </div>
   )
 }

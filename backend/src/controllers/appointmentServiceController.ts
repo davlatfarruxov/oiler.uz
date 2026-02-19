@@ -4,7 +4,7 @@ import { ApiResponse } from '../utils/ApiResponse';
 
 const serviceService = new ServiceService();
 
-export class ServiceController {
+export class AppointmentServiceController {
   async createService(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const service = await serviceService.createService(req.body);

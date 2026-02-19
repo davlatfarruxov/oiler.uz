@@ -8,3 +8,5 @@ export { default as OilChange } from './OilChange';
 export { default as Settings } from './Settings';
 export { default as OilBrand } from './OilBrand';
 export { default as OilProduct } from './OilProduct';
+export { default as Payment } from './Payment';
+export { default as UniversalInventory } from './UniversalInventory';

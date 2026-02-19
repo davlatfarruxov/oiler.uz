@@ -20,23 +20,31 @@ interface EmployeeWithStats extends IEmployeeDocument {
 }
 
 export class EmployeeService {
-  async createEmployee(data: CreateEmployeeData): Promise<IEmployeeDocument> {
-    // Check if email already exists
-    const existingEmployee = await Employee.findOne({ email: data.email });
+  async createEmployee(tenantId: string, data: CreateEmployeeData): Promise<IEmployeeDocument> {
+    // Check if email already exists within this tenant
+    const existingEmployee = await Employee.findOne({ 
+      tenant: tenantId,
+      email: data.email 
+    });
+    
     if (existingEmployee) {
       throw new ApiError(409, 'Employee with this email already exists');
     }
 
-    const employee = await Employee.create(data);
+    const employee = await Employee.create({
+      tenant: tenantId,
+      ...data
+    });
+    
     return employee;
   }
 
-  async getAllEmployees(): Promise<IEmployeeDocument[]> {
-    return Employee.find().sort({ createdAt: -1 });
+  async getAllEmployees(tenantId: string): Promise<IEmployeeDocument[]> {
+    return Employee.find({ tenant: tenantId, isArchived: { $ne: true } }).sort({ createdAt: -1 });
   }
 
-  async getAllEmployeesWithStats(): Promise<any[]> {
-    const employees = await Employee.find().sort({ createdAt: -1 }).lean();
+  async getAllEmployeesWithStats(tenantId: string): Promise<any[]> {
+    const employees = await Employee.find({ tenant: tenantId, isArchived: { $ne: true } }).sort({ createdAt: -1 }).lean();
     
     // Get current month start and end
     const now = new Date();
@@ -46,7 +54,7 @@ export class EmployeeService {
     // Get stats for all employees
     const employeesWithStats = await Promise.all(
       employees.map(async (employee) => {
-        const stats = await this.calculateEmployeeStats(employee._id.toString(), monthStart, monthEnd);
+        const stats = await this.calculateEmployeeStats(tenantId, employee._id.toString(), monthStart, monthEnd);
         return {
           ...employee,
           ...stats
@@ -57,22 +65,26 @@ export class EmployeeService {
     return employeesWithStats;
   }
 
-  async getEmployeeById(employeeId: string): Promise<IEmployeeDocument> {
-    const employee = await Employee.findById(employeeId);
+  async getEmployeeById(tenantId: string, employeeId: string): Promise<IEmployeeDocument> {
+    const employee = await Employee.findOne({ 
+      _id: employeeId,
+      tenant: tenantId 
+    });
+    
     if (!employee) {
       throw new ApiError(404, 'Employee not found');
     }
     return employee;
   }
 
-  async getEmployeeWithPerformance(employeeId: string): Promise<any> {
-    const employee = await this.getEmployeeById(employeeId);
+  async getEmployeeWithPerformance(tenantId: string, employeeId: string): Promise<any> {
+    const employee = await this.getEmployeeById(tenantId, employeeId);
     
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
 
-    const stats = await this.calculateEmployeeStats(employeeId, monthStart, monthEnd);
+    const stats = await this.calculateEmployeeStats(tenantId, employeeId, monthStart, monthEnd);
 
     return {
       ...employee.toObject(),
@@ -80,10 +92,11 @@ export class EmployeeService {
     };
   }
 
-  async updateEmployee(employeeId: string, data: Partial<CreateEmployeeData> & { commissionRate?: number }): Promise<IEmployeeDocument> {
-    // Check if email is being changed and if it conflicts
+  async updateEmployee(tenantId: string, employeeId: string, data: Partial<CreateEmployeeData> & { commissionRate?: number }): Promise<IEmployeeDocument> {
+    // Check if email is being changed and if it conflicts within this tenant
     if (data.email) {
       const existingEmployee = await Employee.findOne({
+        tenant: tenantId,
         _id: { $ne: employeeId },
         email: data.email
       });
@@ -100,8 +113,8 @@ export class EmployeeService {
       }
     }
 
-    const employee = await Employee.findByIdAndUpdate(
-      employeeId,
+    const employee = await Employee.findOneAndUpdate(
+      { _id: employeeId, tenant: tenantId },
       data,
       { new: true, runValidators: true }
     );
@@ -113,8 +126,12 @@ export class EmployeeService {
     return employee;
   }
 
-  async toggleEmployeeStatus(employeeId: string): Promise<IEmployeeDocument> {
-    const employee = await Employee.findById(employeeId);
+  async toggleEmployeeStatus(tenantId: string, employeeId: string): Promise<IEmployeeDocument> {
+    const employee = await Employee.findOne({ 
+      _id: employeeId,
+      tenant: tenantId 
+    });
+    
     if (!employee) {
       throw new ApiError(404, 'Employee not found');
     }
@@ -125,16 +142,20 @@ export class EmployeeService {
     return employee;
   }
 
-  async deleteEmployee(employeeId: string): Promise<void> {
-    const employee = await Employee.findByIdAndDelete(employeeId);
+  async deleteEmployee(tenantId: string, employeeId: string): Promise<void> {
+    const employee = await Employee.findOneAndDelete({ 
+      _id: employeeId,
+      tenant: tenantId 
+    });
+    
     if (!employee) {
       throw new ApiError(404, 'Employee not found');
     }
   }
 
-  async getEmployeeStats(): Promise<any> {
-    const totalEmployees = await Employee.countDocuments();
-    const activeEmployees = await Employee.countDocuments({ active: true });
+  async getEmployeeStats(tenantId: string): Promise<any> {
+    const totalEmployees = await Employee.countDocuments({ tenant: tenantId });
+    const activeEmployees = await Employee.countDocuments({ tenant: tenantId, active: true });
     
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -143,6 +164,7 @@ export class EmployeeService {
     const monthlyStats = await OilChange.aggregate([
       {
         $match: {
+          tenant: new mongoose.Types.ObjectId(tenantId),
           createdAt: { $gte: monthStart, $lte: monthEnd }
         }
       },
@@ -163,8 +185,8 @@ export class EmployeeService {
     };
   }
 
-  async getEmployeePerformance(employeeId: string): Promise<any> {
-    const employee = await this.getEmployeeById(employeeId);
+  async getEmployeePerformance(tenantId: string, employeeId: string): Promise<any> {
+    const employee = await this.getEmployeeById(tenantId, employeeId);
     
     // Get last 6 months performance
     const months = [];
@@ -174,7 +196,7 @@ export class EmployeeService {
       const monthStart = new Date(date.getFullYear(), date.getMonth(), 1);
       const monthEnd = new Date(date.getFullYear(), date.getMonth() + 1, 0, 23, 59, 59);
 
-      const stats = await this.calculateEmployeeStats(employeeId, monthStart, monthEnd);
+      const stats = await this.calculateEmployeeStats(tenantId, employeeId, monthStart, monthEnd);
       
       months.push({
         month: date.toLocaleString('default', { month: 'short', year: 'numeric' }),
@@ -189,10 +211,11 @@ export class EmployeeService {
     };
   }
 
-  private async calculateEmployeeStats(employeeId: string, startDate: Date, endDate: Date): Promise<any> {
+  private async calculateEmployeeStats(tenantId: string, employeeId: string, startDate: Date, endDate: Date): Promise<any> {
     const stats = await OilChange.aggregate([
       {
         $match: {
+          tenant: new mongoose.Types.ObjectId(tenantId),
           employees: new mongoose.Types.ObjectId(employeeId),
           createdAt: { $gte: startDate, $lte: endDate }
         }
@@ -223,11 +246,11 @@ export class EmployeeService {
     };
   }
 
-  async getActiveEmployees(): Promise<IEmployeeDocument[]> {
-    return Employee.find({ active: true }).sort({ name: 1 });
+  async getActiveEmployees(tenantId: string): Promise<IEmployeeDocument[]> {
+    return Employee.find({ tenant: tenantId, active: true }).sort({ name: 1 });
   }
 
-  async getTopPerformer(): Promise<any> {
+  async getTopPerformer(tenantId: string): Promise<any> {
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
     const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
@@ -235,6 +258,7 @@ export class EmployeeService {
     const topPerformers = await OilChange.aggregate([
       {
         $match: {
+          tenant: new mongoose.Types.ObjectId(tenantId),
           createdAt: { $gte: monthStart, $lte: monthEnd }
         }
       },
@@ -268,5 +292,73 @@ export class EmployeeService {
     ]);
 
     return topPerformers[0] || null;
+  }
+
+  async archiveEmployee(tenantId: string, employeeId: string, userId: string, reason?: string): Promise<void> {
+    const employee = await Employee.findOne({ 
+      _id: employeeId,
+      tenant: tenantId 
+    });
+    
+    if (!employee) {
+      throw new ApiError(404, 'Employee not found');
+    }
+
+    if (employee.isArchived) {
+      throw new ApiError(400, 'Employee is already archived');
+    }
+
+    employee.isArchived = true;
+    employee.archivedAt = new Date();
+    employee.archivedBy = userId as any;
+    employee.active = false; // Also deactivate
+    await employee.save();
+  }
+
+  async restoreEmployee(tenantId: string, employeeId: string): Promise<IEmployeeDocument> {
+    const employee = await Employee.findOne({ 
+      _id: employeeId,
+      tenant: tenantId 
+    });
+    
+    if (!employee) {
+      throw new ApiError(404, 'Employee not found');
+    }
+
+    if (!employee.isArchived) {
+      throw new ApiError(400, 'Employee is not archived');
+    }
+
+    employee.isArchived = false;
+    employee.archivedAt = undefined;
+    employee.archivedBy = undefined;
+    employee.active = true; // Reactivate
+    await employee.save();
+
+    return employee;
+  }
+
+  async getArchivedEmployees(tenantId: string, page: number = 1, limit: number = 100) {
+    const skip = (page - 1) * limit;
+    
+    const filter = { tenant: tenantId, isArchived: true };
+    
+    const [data, totalItems] = await Promise.all([
+      Employee.find(filter)
+        .populate('archivedBy', 'name email')
+        .sort({ archivedAt: -1 })
+        .skip(skip)
+        .limit(limit)
+        .lean(),
+      Employee.countDocuments(filter)
+    ]);
+    
+    return {
+      data,
+      page,
+      limit,
+      totalPages: Math.ceil(totalItems / limit),
+      totalItems
+    };
   }
 }

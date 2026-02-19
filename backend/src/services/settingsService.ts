@@ -28,22 +28,21 @@ interface ChangePasswordData {
 }
 
 export class SettingsService {
-  async getSettings(): Promise<ISettings> {
-    let settings = await Settings.findOne();
+  async getSettings(tenantId: string): Promise<ISettings> {
+    let settings = await Settings.findOne({ tenant: tenantId });
     
-    // Create default settings if none exist
     if (!settings) {
-      settings = await Settings.create({});
+      settings = await Settings.create({ tenant: tenantId });
     }
     
     return settings;
   }
 
-  async updateCompanyInfo(data: UpdateCompanyData): Promise<ISettings> {
-    let settings = await Settings.findOne();
+  async updateCompanyInfo(tenantId: string, data: UpdateCompanyData): Promise<ISettings> {
+    let settings = await Settings.findOne({ tenant: tenantId });
     
     if (!settings) {
-      settings = await Settings.create(data);
+      settings = await Settings.create({ tenant: tenantId, ...data });
     } else {
       Object.assign(settings, data);
       await settings.save();
@@ -52,11 +51,11 @@ export class SettingsService {
     return settings;
   }
 
-  async updateServiceDefaults(data: UpdateServiceDefaultsData): Promise<ISettings> {
-    let settings = await Settings.findOne();
+  async updateServiceDefaults(tenantId: string, data: UpdateServiceDefaultsData): Promise<ISettings> {
+    let settings = await Settings.findOne({ tenant: tenantId });
     
     if (!settings) {
-      settings = await Settings.create(data);
+      settings = await Settings.create({ tenant: tenantId, ...data });
     } else {
       Object.assign(settings, data);
       await settings.save();
@@ -65,11 +64,15 @@ export class SettingsService {
     return settings;
   }
 
-  async updateExchangeRate(exchangeRate: number): Promise<ISettings> {
-    let settings = await Settings.findOne();
+  async updateExchangeRate(tenantId: string, exchangeRate: number): Promise<ISettings> {
+    if (!exchangeRate || exchangeRate <= 0) {
+      throw new ApiError(400, 'Exchange rate must be a positive number');
+    }
+    
+    let settings = await Settings.findOne({ tenant: tenantId });
     
     if (!settings) {
-      settings = await Settings.create({ exchangeRate });
+      settings = await Settings.create({ tenant: tenantId, exchangeRate });
     } else {
       settings.exchangeRate = exchangeRate;
       await settings.save();
@@ -78,8 +81,9 @@ export class SettingsService {
     return settings;
   }
 
-  async getNotificationPreferences(userId: string) {
-    const user = await User.findById(userId).select('emailNotifications smsNotifications lowStockAlerts dailyReport');
+  async getNotificationPreferences(userId: string, tenantId: string) {
+    const user = await User.findOne({ _id: userId, tenant: tenantId })
+      .select('emailNotifications smsNotifications lowStockAlerts dailyReport');
     
     if (!user) {
       throw new ApiError(404, 'User not found');
@@ -93,8 +97,8 @@ export class SettingsService {
     };
   }
 
-  async updateNotificationPreferences(userId: string, data: UpdateNotificationPreferencesData) {
-    const user = await User.findById(userId);
+  async updateNotificationPreferences(userId: string, tenantId: string, data: UpdateNotificationPreferencesData) {
+    const user = await User.findOne({ _id: userId, tenant: tenantId });
     
     if (!user) {
       throw new ApiError(404, 'User not found');
@@ -115,25 +119,22 @@ export class SettingsService {
     };
   }
 
-  async changePassword(userId: string, data: ChangePasswordData): Promise<void> {
-    const user = await User.findById(userId).select('+password');
+  async changePassword(userId: string, tenantId: string, data: ChangePasswordData): Promise<void> {
+    const user = await User.findOne({ _id: userId, tenant: tenantId }).select('+password');
     
     if (!user) {
       throw new ApiError(404, 'User not found');
     }
     
-    // Verify current password
     const isPasswordValid = await user.comparePassword(data.currentPassword);
     if (!isPasswordValid) {
       throw new ApiError(401, 'Current password is incorrect');
     }
     
-    // Validate new password
     if (data.newPassword.length < 6) {
       throw new ApiError(400, 'New password must be at least 6 characters');
     }
     
-    // Update password
     user.password = data.newPassword;
     await user.save();
   }

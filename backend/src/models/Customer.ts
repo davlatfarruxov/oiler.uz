@@ -5,6 +5,8 @@ export interface ICustomerDocument extends Document {
   name: string;
   phone: string;
   vehicles: mongoose.Types.ObjectId[];
+  totalDebt: number;
+  lastPaymentDate?: Date;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -30,7 +32,16 @@ const customerSchema = new Schema<ICustomerDocument>(
     vehicles: [{
       type: Schema.Types.ObjectId,
       ref: 'Vehicle'
-    }]
+    }],
+    totalDebt: {
+      type: Number,
+      default: 0,
+      min: 0,
+      index: true
+    },
+    lastPaymentDate: {
+      type: Date
+    }
   },
   {
     timestamps: true
@@ -39,7 +50,6 @@ const customerSchema = new Schema<ICustomerDocument>(
 
 // Compound indexes for multi-tenant queries
 customerSchema.index({ tenant: 1, createdAt: -1 });
-customerSchema.index({ tenant: 1, phone: 1 });
 
 // Phone should be unique per tenant
 customerSchema.index({ tenant: 1, phone: 1 }, { unique: true });

@@ -13,6 +13,7 @@ export interface IAdditionalProduct {
 }
 
 export interface IOilChangeDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   vehicle: mongoose.Types.ObjectId;
   customer: mongoose.Types.ObjectId;
   employees: mongoose.Types.ObjectId[];
@@ -42,6 +43,15 @@ export interface IOilChangeDocument extends Document {
   nextServiceMileage: number;
   laborCost: number;
   price: number;
+  // Payment tracking fields
+  paymentStatus: 'paid' | 'partial' | 'unpaid';
+  amountPaid: number;
+  amountDue: number;
+  dueDate?: Date;
+  paidAt?: Date;
+  isArchived: boolean;
+  archivedAt?: Date;
+  archivedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -85,6 +95,12 @@ const additionalProductSchema = new Schema({
 
 const oilChangeSchema = new Schema<IOilChangeDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     vehicle: {
       type: Schema.Types.ObjectId,
       ref: 'Vehicle',
@@ -197,6 +213,40 @@ const oilChangeSchema = new Schema<IOilChangeDocument>(
       type: Number,
       required: [true, 'Price is required'],
       min: 0
+    },
+    // Payment tracking fields
+    paymentStatus: {
+      type: String,
+      enum: ['paid', 'partial', 'unpaid'],
+      default: 'unpaid',
+      index: true
+    },
+    amountPaid: {
+      type: Number,
+      default: 0,
+      min: 0
+    },
+    amountDue: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    dueDate: {
+      type: Date,
+      index: true
+    },
+    paidAt: {
+      type: Date
+    },
+    isArchived: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    archivedAt: Date,
+    archivedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     }
   },
   {
@@ -204,9 +254,12 @@ const oilChangeSchema = new Schema<IOilChangeDocument>(
   }
 );
 
-oilChangeSchema.index({ vehicle: 1, createdAt: -1 });
-oilChangeSchema.index({ customer: 1, createdAt: -1 });
-oilChangeSchema.index({ employees: 1, createdAt: -1 });
-oilChangeSchema.index({ createdAt: -1 });
+// Compound indexes for multi-tenant queries
+oilChangeSchema.index({ tenant: 1, createdAt: -1 });
+oilChangeSchema.index({ tenant: 1, vehicle: 1, createdAt: -1 });
+oilChangeSchema.index({ tenant: 1, customer: 1, createdAt: -1 });
+oilChangeSchema.index({ tenant: 1, employees: 1, createdAt: -1 });
+oilChangeSchema.index({ tenant: 1, paymentStatus: 1 });
+oilChangeSchema.index({ tenant: 1, dueDate: 1, paymentStatus: 1 });
 
 export default mongoose.model<IOilChangeDocument>('OilChange', oilChangeSchema);

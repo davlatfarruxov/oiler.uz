@@ -19,6 +19,9 @@ const employeeValidation = [
 // All routes require authentication
 router.use(authenticate);
 
+// Get archived employees
+router.get('/archived', employeeController.getArchivedEmployees.bind(employeeController));
+
 // Get all employees with stats
 router.get('/', employeeController.getAllEmployees.bind(employeeController));
 
@@ -58,6 +61,13 @@ router.delete(
   '/:id',
   authorize(UserRole.SUPER_ADMIN),
   employeeController.deleteEmployee.bind(employeeController)
+);
+
+// Restore employee (SuperAdmin only)
+router.post(
+  '/:id/restore',
+  authorize(UserRole.SUPER_ADMIN),
+  employeeController.restoreEmployee.bind(employeeController)
 );
 
 export default router;

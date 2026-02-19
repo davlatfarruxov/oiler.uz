@@ -10,6 +10,9 @@ import oilProductRoutes from './oilProductRoutes';
 import oilBrandRoutes from './oilBrandRoutes';
 import filterRoutes from './filterRoutes';
 import filterBrandRoutes from './filterBrandRoutes';
+import archiveRoutes from './archiveRoutes';
+import paymentRoutes from './paymentRoutes';
+import generalServiceRoutes from './generalServiceRoutes';
 
 const router = Router();
 
@@ -24,5 +27,8 @@ router.use('/oil-products', oilProductRoutes);
 router.use('/oil-brands', oilBrandRoutes);
 router.use('/filters', filterRoutes);
 router.use('/filter-brands', filterBrandRoutes);
+router.use('/archives', archiveRoutes);
+router.use('/payments', paymentRoutes);
+router.use('/services', generalServiceRoutes);
 
 export default router;

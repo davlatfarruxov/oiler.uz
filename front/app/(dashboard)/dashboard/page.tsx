@@ -19,7 +19,8 @@ import {
   Pie,
   Cell,
 } from 'recharts'
-import { TrendingUp, Car, DollarSign, AlertCircle, Loader2, Wrench } from 'lucide-react'
+import { TrendingUp, Car, DollarSign, AlertCircle, Loader2, Wrench, CreditCard } from 'lucide-react'
+import { OverduePaymentsAlert } from '@/components/OverduePaymentsAlert'
 
 const StatCard = ({ title, value, icon: Icon, description, isLoading }: any) => (
   <Card>
@@ -50,9 +51,13 @@ export default function DashboardPage() {
     todayServices: 0,
     totalVehicles: 0,
     monthlyRevenue: 0,
-    lowStockAlerts: 0
+    lowStockAlerts: 0,
+    totalOutstandingDebt: 0,
+    overduePaymentsCount: 0
   })
   const [recentServices, setRecentServices] = useState<any[]>([])
+  const [overdueServices, setOverdueServices] = useState<any[]>([])
+  const [recentPayments, setRecentPayments] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   useEffect(() => {
@@ -63,22 +68,29 @@ export default function DashboardPage() {
     try {
       setIsLoading(true)
       
-      const [todayCount, vehiclesCount, monthlyRevenue, lowStock, recent] = await Promise.all([
+      const [todayCount, vehiclesCount, monthlyRevenue, lowStock, recent, overdue, payments, debtSummary] = await Promise.all([
         api.get('/oil-changes/today-count'),
         api.get('/vehicles/count'),
         api.get('/oil-changes/monthly-revenue'),
         api.get('/inventory/low-stock'),
-        api.get('/oil-changes/recent?limit=5')
+        api.get('/oil-changes/recent?limit=5'),
+        api.get('/payments/overdue'),
+        api.get('/payments/recent?limit=5'),
+        api.get('/payments/debt-summary')
       ])
 
       setStats({
         todayServices: todayCount.data.data.count,
         totalVehicles: vehiclesCount.data.data.count,
         monthlyRevenue: monthlyRevenue.data.data.revenue,
-        lowStockAlerts: lowStock.data.data.length
+        lowStockAlerts: lowStock.data.data.length,
+        totalOutstandingDebt: debtSummary.data.data?.totalDebt || 0,
+        overduePaymentsCount: overdue.data.data?.length || 0
       })
 
       setRecentServices(recent.data.data)
+      setOverdueServices(overdue.data.data || [])
+      setRecentPayments(payments.data.data || [])
     } catch (error) {
       console.error('Failed to fetch dashboard data:', error)
     } finally {
@@ -125,7 +137,7 @@ export default function DashboardPage() {
         />
         <StatCard
           title="Monthly Revenue"
-          value={`$${stats.monthlyRevenue.toLocaleString()}`}
+          value={`$${(stats.monthlyRevenue || 0).toLocaleString()}`}
           icon={DollarSign}
           description="This month"
           isLoading={isLoading}
@@ -138,6 +150,67 @@ export default function DashboardPage() {
           isLoading={isLoading}
         />
       </div>
+
+      {/* Payment Tracking Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card className="border-destructive/50">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Jami qarz</p>
+                {isLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-destructive mt-2">
+                      {(stats.totalOutstandingDebt || 0).toLocaleString()} so'm
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Barcha mijozlarning qarzi
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="p-3 bg-destructive/10 rounded-lg">
+                <CreditCard className="w-6 h-6 text-destructive" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-orange-500/50">
+          <CardContent className="pt-6">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Muddati o'tgan to'lovlar</p>
+                {isLoading ? (
+                  <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
+                ) : (
+                  <>
+                    <p className="text-2xl font-bold text-orange-600 mt-2">
+                      {stats.overduePaymentsCount}
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      To'lov muddati o'tgan xizmatlar
+                    </p>
+                  </>
+                )}
+              </div>
+              <div className="p-3 bg-orange-500/10 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Overdue Payments Alert */}
+      {!isLoading && overdueServices.length > 0 && (
+        <OverduePaymentsAlert
+          overdueServices={overdueServices}
+          totalOverdueAmount={overdueServices.reduce((sum, s) => sum + s.amountDue, 0)}
+        />
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
@@ -226,7 +299,7 @@ export default function DashboardPage() {
             </div>
           ) : recentServices.length === 0 ? (
             <div className="text-center py-8">
-              <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <AlertCircle className="w-8 w-8 text-muted-foreground mx-auto mb-2" />
               <p className="text-muted-foreground">No recent services</p>
             </div>
           ) : (
@@ -263,6 +336,68 @@ export default function DashboardPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Recent Payments Widget */}
+      <Card>
+        <CardHeader>
+          <CardTitle>So'nggi to'lovlar</CardTitle>
+          <CardDescription>Oxirgi qabul qilingan to'lovlar</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : recentPayments.length === 0 ? (
+            <div className="text-center py-8">
+              <CreditCard className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+              <p className="text-muted-foreground">Hali to'lovlar yo'q</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {recentPayments.map((payment: any) => (
+                <div
+                  key={payment._id}
+                  className="flex items-center justify-between p-3 border border-border rounded-lg hover:bg-muted/50 transition-colors"
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-1">
+                      <p className="font-semibold text-foreground">
+                        {payment.customer?.name || 'N/A'}
+                      </p>
+                      <span className="text-xs text-muted-foreground">•</span>
+                      <span className="text-xs text-muted-foreground">
+                        {payment.vehicle?.plateNumber || 'N/A'}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                      <span className="capitalize">
+                        {payment.paymentMethod === 'cash' ? 'Naqd' :
+                         payment.paymentMethod === 'card' ? 'Karta' :
+                         payment.paymentMethod === 'transfer' ? 'O\'tkazma' :
+                         payment.paymentMethod}
+                      </span>
+                      <span>•</span>
+                      <span>{new Date(payment.createdAt).toLocaleDateString('uz-UZ')}</span>
+                    </div>
+                    {payment.notes && (
+                      <p className="text-xs text-muted-foreground mt-1 italic">
+                        {payment.notes}
+                      </p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-green-600">
+                      {(payment.amount || 0).toLocaleString()}
+                    </p>
+                    <p className="text-xs text-muted-foreground">so'm</p>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </CardContent>

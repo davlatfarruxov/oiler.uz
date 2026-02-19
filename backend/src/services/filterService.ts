@@ -31,14 +31,15 @@ interface UpdateFilterData {
 }
 
 export class FilterService {
-  async createFilter(data: CreateFilterData): Promise<IFilterDocument> {
-    let settings = await Settings.findOne();
+  async createFilter(tenantId: string, data: CreateFilterData): Promise<IFilterDocument> {
+    let settings = await Settings.findOne({ tenant: tenantId });
     if (!settings) {
-      settings = await Settings.create({});
+      settings = await Settings.create({ tenant: tenantId });
     }
     const exchangeRate = settings.exchangeRate;
 
     const existingFilter = await Filter.findOne({
+      tenant: tenantId,
       brandName: data.brandName,
       filterType: data.filterType,
       partNumber: data.partNumber
@@ -49,6 +50,7 @@ export class FilterService {
     }
 
     const filter = await Filter.create({
+      tenant: tenantId,
       brandName: data.brandName,
       filterType: data.filterType,
       partNumber: data.partNumber,
@@ -65,8 +67,11 @@ export class FilterService {
     return filter;
   }
 
-  async getAllFilters(activeOnly: boolean = false, filterType?: FilterType, brandName?: string): Promise<any[]> {
-    const filter: any = activeOnly ? { active: true } : {};
+  async getAllFilters(tenantId: string, activeOnly: boolean = false, filterType?: FilterType, brandName?: string): Promise<any[]> {
+    const filter: any = { tenant: tenantId };
+    if (activeOnly) {
+      filter.active = true;
+    }
     if (filterType) {
       filter.filterType = filterType;
     }
@@ -95,22 +100,23 @@ export class FilterService {
     }));
   }
 
-  async getFilterById(id: string): Promise<IFilterDocument> {
-    const filter = await Filter.findById(id);
+  async getFilterById(tenantId: string, id: string): Promise<IFilterDocument> {
+    const filter = await Filter.findOne({ _id: id, tenant: tenantId });
     if (!filter) {
       throw new ApiError(404, 'Filter not found');
     }
     return filter;
   }
 
-  async updateFilter(id: string, data: UpdateFilterData): Promise<IFilterDocument> {
-    const filter = await Filter.findById(id);
+  async updateFilter(tenantId: string, id: string, data: UpdateFilterData): Promise<IFilterDocument> {
+    const filter = await Filter.findOne({ _id: id, tenant: tenantId });
     if (!filter) {
       throw new ApiError(404, 'Filter not found');
     }
 
     if (data.brandName || data.filterType || data.partNumber) {
       const checkData = {
+        tenant: tenantId,
         brandName: data.brandName || filter.brandName,
         filterType: data.filterType || filter.filterType,
         partNumber: data.partNumber || filter.partNumber
@@ -139,7 +145,7 @@ export class FilterService {
     if (data.active !== undefined) filter.active = data.active;
     
     if (data.costPrice !== undefined || data.costCurrency) {
-      const settings = await Settings.findOne();
+      const settings = await Settings.findOne({ tenant: tenantId });
       if (settings) {
         filter.exchangeRateUsed = settings.exchangeRate;
       }
@@ -149,16 +155,16 @@ export class FilterService {
     return filter;
   }
 
-  async deleteFilter(id: string): Promise<void> {
-    const filter = await Filter.findById(id);
+  async deleteFilter(tenantId: string, id: string): Promise<void> {
+    const filter = await Filter.findOne({ _id: id, tenant: tenantId });
     if (!filter) {
       throw new ApiError(404, 'Filter not found');
     }
     await filter.deleteOne();
   }
 
-  async updateStock(id: string, quantity: number): Promise<IFilterDocument> {
-    const filter = await Filter.findById(id);
+  async updateStock(tenantId: string, id: string, quantity: number): Promise<IFilterDocument> {
+    const filter = await Filter.findOne({ _id: id, tenant: tenantId });
     if (!filter) {
       throw new ApiError(404, 'Filter not found');
     }
@@ -172,8 +178,9 @@ export class FilterService {
     return filter;
   }
 
-  async getLowStockFilters(threshold: number = 10): Promise<IFilterDocument[]> {
+  async getLowStockFilters(tenantId: string, threshold: number = 10): Promise<IFilterDocument[]> {
     return Filter.find({
+      tenant: tenantId,
       active: true,
       stock: { $lte: threshold }
     })

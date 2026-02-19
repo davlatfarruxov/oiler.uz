@@ -8,7 +8,8 @@ const oilBrandService = new OilBrandService();
 export class OilBrandController {
   async createOilBrand(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const brand = await oilBrandService.createOilBrand(req.body);
+      const tenantId = req.user!.tenantId;
+      const brand = await oilBrandService.createOilBrand(tenantId, req.body);
       res.status(201).json(ApiResponse.success('Oil brand created', brand));
     } catch (error) {
       next(error);
@@ -17,8 +18,9 @@ export class OilBrandController {
 
   async getAllOilBrands(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
+      const tenantId = req.user!.tenantId;
       const activeOnly = req.query.activeOnly === 'true';
-      const brands = await oilBrandService.getAllOilBrands(activeOnly);
+      const brands = await oilBrandService.getAllOilBrands(tenantId, activeOnly);
       res.status(200).json(ApiResponse.success('Oil brands retrieved', brands));
     } catch (error) {
       next(error);
@@ -27,7 +29,8 @@ export class OilBrandController {
 
   async getOilBrandById(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const brand = await oilBrandService.getOilBrandById(req.params.id);
+      const tenantId = req.user!.tenantId;
+      const brand = await oilBrandService.getOilBrandById(tenantId, req.params.id);
       res.status(200).json(ApiResponse.success('Oil brand retrieved', brand));
     } catch (error) {
       next(error);
@@ -36,7 +39,8 @@ export class OilBrandController {
 
   async updateOilBrand(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      const brand = await oilBrandService.updateOilBrand(req.params.id, req.body);
+      const tenantId = req.user!.tenantId;
+      const brand = await oilBrandService.updateOilBrand(tenantId, req.params.id, req.body);
       res.status(200).json(ApiResponse.success('Oil brand updated', brand));
     } catch (error) {
       next(error);
@@ -45,7 +49,8 @@ export class OilBrandController {
 
   async deleteOilBrand(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
-      await oilBrandService.deleteOilBrand(req.params.id);
+      const tenantId = req.user!.tenantId;
+      await oilBrandService.deleteOilBrand(tenantId, req.params.id);
       res.status(200).json(ApiResponse.success('Oil brand deleted'));
     } catch (error) {
       next(error);

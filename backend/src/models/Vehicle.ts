@@ -8,6 +8,9 @@ export interface IVehicleDocument extends Document {
   vehicleModel: string; // Renamed from 'model' to avoid conflict with Document.model()
   engineType: EngineType;
   customer: mongoose.Types.ObjectId;
+  isArchived: boolean;
+  archivedAt?: Date;
+  archivedBy?: mongoose.Types.ObjectId;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -46,6 +49,16 @@ const vehicleSchema = new Schema<IVehicleDocument>(
       ref: 'Customer',
       required: true,
       index: true
+    },
+    isArchived: {
+      type: Boolean,
+      default: false,
+      index: true
+    },
+    archivedAt: Date,
+    archivedBy: {
+      type: Schema.Types.ObjectId,
+      ref: 'User'
     }
   },
   {
@@ -56,7 +69,6 @@ const vehicleSchema = new Schema<IVehicleDocument>(
 // Compound indexes for multi-tenant queries
 vehicleSchema.index({ tenant: 1, createdAt: -1 });
 vehicleSchema.index({ tenant: 1, customer: 1 });
-vehicleSchema.index({ tenant: 1, plateNumber: 1 });
 
 // Plate number should be unique per tenant
 vehicleSchema.index({ tenant: 1, plateNumber: 1 }, { unique: true });

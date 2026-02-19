@@ -11,9 +11,10 @@ interface CreateInventoryData {
 }
 
 export class InventoryService {
-  async createItem(data: CreateInventoryData): Promise<IInventoryDocument> {
-    // Check if item with same name already exists
+  async createItem(tenantId: string, data: CreateInventoryData): Promise<IInventoryDocument> {
+    // Check if item with same name already exists for this tenant
     const existingItem = await Inventory.findOne({ 
+      tenant: tenantId,
       name: { $regex: new RegExp(`^${data.name}$`, 'i') },
       productType: data.productType 
     });
@@ -22,33 +23,38 @@ export class InventoryService {
       throw new ApiError(409, 'Item with this name already exists');
     }
 
-    const item = await Inventory.create(data);
+    const item = await Inventory.create({
+      tenant: tenantId,
+      ...data
+    });
     return item;
   }
 
-  async getAllItems(): Promise<IInventoryDocument[]> {
-    return Inventory.find().sort({ productType: 1, name: 1 });
+  async getAllItems(tenantId: string): Promise<IInventoryDocument[]> {
+    return Inventory.find({ tenant: tenantId }).sort({ productType: 1, name: 1 });
   }
 
-  async getLowStockItems(): Promise<IInventoryDocument[]> {
-    // Find items where stock <= reorderLevel
+  async getLowStockItems(tenantId: string): Promise<IInventoryDocument[]> {
+    // Find items where stock <= reorderLevel for this tenant
     return Inventory.find({
+      tenant: tenantId,
       $expr: { $lte: ['$stock', '$reorderLevel'] }
     }).sort({ stock: 1 });
   }
 
-  async getItemById(itemId: string): Promise<IInventoryDocument> {
-    const item = await Inventory.findById(itemId);
+  async getItemById(tenantId: string, itemId: string): Promise<IInventoryDocument> {
+    const item = await Inventory.findOne({ _id: itemId, tenant: tenantId });
     if (!item) {
       throw new ApiError(404, 'Inventory item not found');
     }
     return item;
   }
 
-  async updateItem(itemId: string, data: Partial<CreateInventoryData>): Promise<IInventoryDocument> {
+  async updateItem(tenantId: string, itemId: string, data: Partial<CreateInventoryData>): Promise<IInventoryDocument> {
     // Check if updating name conflicts with existing item
     if (data.name) {
       const existingItem = await Inventory.findOne({
+        tenant: tenantId,
         _id: { $ne: itemId },
         name: { $regex: new RegExp(`^${data.name}$`, 'i') },
         productType: data.productType
@@ -59,8 +65,8 @@ export class InventoryService {
       }
     }
 
-    const item = await Inventory.findByIdAndUpdate(
-      itemId,
+    const item = await Inventory.findOneAndUpdate(
+      { _id: itemId, tenant: tenantId },
       data,
       { new: true, runValidators: true }
     );
@@ -72,15 +78,15 @@ export class InventoryService {
     return item;
   }
 
-  async deleteItem(itemId: string): Promise<void> {
-    const item = await Inventory.findByIdAndDelete(itemId);
+  async deleteItem(tenantId: string, itemId: string): Promise<void> {
+    const item = await Inventory.findOneAndDelete({ _id: itemId, tenant: tenantId });
     if (!item) {
       throw new ApiError(404, 'Inventory item not found');
     }
   }
 
-  async updateStock(itemId: string, quantity: number, operation: 'add' | 'subtract'): Promise<IInventoryDocument> {
-    const item = await Inventory.findById(itemId);
+  async updateStock(tenantId: string, itemId: string, quantity: number, operation: 'add' | 'subtract'): Promise<IInventoryDocument> {
+    const item = await Inventory.findOne({ _id: itemId, tenant: tenantId });
     if (!item) {
       throw new ApiError(404, 'Inventory item not found');
     }
@@ -98,11 +104,11 @@ export class InventoryService {
     return item;
   }
 
-  async getItemsByType(productType: ProductType): Promise<IInventoryDocument[]> {
-    return Inventory.find({ productType }).sort({ name: 1 });
+  async getItemsByType(tenantId: string, productType: ProductType): Promise<IInventoryDocument[]> {
+    return Inventory.find({ tenant: tenantId, productType }).sort({ name: 1 });
   }
 
-  async checkAndGetLowStockAlerts(): Promise<IInventoryDocument[]> {
-    return this.getLowStockItems();
+  async checkAndGetLowStockAlerts(tenantId: string): Promise<IInventoryDocument[]> {
+    return this.getLowStockItems(tenantId);
   }
 }

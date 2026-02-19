@@ -21,7 +21,11 @@ export default function RegisterPage() {
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    companyName: '',
+    businessEmail: '',
+    businessPhone: '',
+    address: ''
   });
 
   const [validationError, setValidationError] = useState('');
@@ -50,7 +54,11 @@ export default function RegisterPage() {
       await dispatch(register({
         name: formData.name,
         email: formData.email,
-        password: formData.password
+        password: formData.password,
+        companyName: formData.companyName,
+        businessEmail: formData.businessEmail,
+        businessPhone: formData.businessPhone,
+        address: formData.address
       })).unwrap();
       router.push('/dashboard');
     } catch (err) {
@@ -71,7 +79,7 @@ export default function RegisterPage() {
         <CardHeader className="space-y-1">
           <CardTitle className="text-2xl font-bold text-center">Create an account</CardTitle>
           <CardDescription className="text-center">
-            Enter your details to get started with Oiler
+            Enter your details and company information to get started
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -81,57 +89,118 @@ export default function RegisterPage() {
                 <AlertDescription>{validationError || error}</AlertDescription>
               </Alert>
             )}
-            <div className="space-y-2">
-              <Label htmlFor="name">Full Name</Label>
-              <Input
-                id="name"
-                name="name"
-                type="text"
-                placeholder="John Doe"
-                value={formData.name}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
+            
+            {/* Personal Information */}
+            <div className="space-y-3">
+              <h3 className="text-sm font-semibold text-muted-foreground">Personal Information</h3>
+              <div className="space-y-2">
+                <Label htmlFor="name">Full Name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="email">Email</Label>
+                <Input
+                  id="email"
+                  name="email"
+                  type="email"
+                  placeholder="john@example.com"
+                  value={formData.email}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">Password</Label>
+                <Input
+                  id="password"
+                  name="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                value={formData.email}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                placeholder="••••••••"
-                value={formData.password}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirm Password</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                placeholder="••••••••"
-                value={formData.confirmPassword}
-                onChange={handleChange}
-                required
-                disabled={isLoading}
-              />
+
+            {/* Company Information */}
+            <div className="space-y-3 pt-2 border-t">
+              <h3 className="text-sm font-semibold text-muted-foreground">Company Information</h3>
+              <div className="space-y-2">
+                <Label htmlFor="companyName">Company Name</Label>
+                <Input
+                  id="companyName"
+                  name="companyName"
+                  type="text"
+                  placeholder="Acme Oil Change"
+                  value={formData.companyName}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="businessEmail">Business Email</Label>
+                <Input
+                  id="businessEmail"
+                  name="businessEmail"
+                  type="email"
+                  placeholder="info@company.com"
+                  value={formData.businessEmail}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="businessPhone">Business Phone</Label>
+                <Input
+                  id="businessPhone"
+                  name="businessPhone"
+                  type="tel"
+                  placeholder="+998 90 123 45 67"
+                  value={formData.businessPhone}
+                  onChange={handleChange}
+                  required
+                  disabled={isLoading}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="address">Address (Optional)</Label>
+                <Input
+                  id="address"
+                  name="address"
+                  type="text"
+                  placeholder="123 Main St, Tashkent"
+                  value={formData.address}
+                  onChange={handleChange}
+                  disabled={isLoading}
+                />
+              </div>
             </div>
           </CardContent>
           <CardFooter className="flex flex-col space-y-4">

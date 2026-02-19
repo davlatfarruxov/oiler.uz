@@ -6,32 +6,39 @@ interface CreateFilterBrandData {
 }
 
 export class FilterBrandService {
-  async createFilterBrand(data: CreateFilterBrandData): Promise<IFilterBrandDocument> {
-    const existingBrand = await FilterBrand.findOne({ name: data.name });
+  async createFilterBrand(tenantId: string, data: CreateFilterBrandData): Promise<IFilterBrandDocument> {
+    const existingBrand = await FilterBrand.findOne({ tenant: tenantId, name: data.name });
     if (existingBrand) {
       throw new ApiError(409, 'Filter brand with this name already exists');
     }
 
-    const brand = await FilterBrand.create(data);
+    const brand = await FilterBrand.create({
+      tenant: tenantId,
+      ...data
+    });
     return brand;
   }
 
-  async getAllFilterBrands(activeOnly: boolean = false): Promise<IFilterBrandDocument[]> {
-    const filter = activeOnly ? { active: true } : {};
+  async getAllFilterBrands(tenantId: string, activeOnly: boolean = false): Promise<IFilterBrandDocument[]> {
+    const filter: any = { tenant: tenantId };
+    if (activeOnly) {
+      filter.active = true;
+    }
     return FilterBrand.find(filter).sort({ name: 1 });
   }
 
-  async getFilterBrandById(id: string): Promise<IFilterBrandDocument> {
-    const brand = await FilterBrand.findById(id);
+  async getFilterBrandById(tenantId: string, id: string): Promise<IFilterBrandDocument> {
+    const brand = await FilterBrand.findOne({ _id: id, tenant: tenantId });
     if (!brand) {
       throw new ApiError(404, 'Filter brand not found');
     }
     return brand;
   }
 
-  async updateFilterBrand(id: string, data: Partial<CreateFilterBrandData>): Promise<IFilterBrandDocument> {
+  async updateFilterBrand(tenantId: string, id: string, data: Partial<CreateFilterBrandData>): Promise<IFilterBrandDocument> {
     if (data.name) {
       const existingBrand = await FilterBrand.findOne({
+        tenant: tenantId,
         _id: { $ne: id },
         name: data.name
       });
@@ -40,15 +47,19 @@ export class FilterBrandService {
       }
     }
 
-    const brand = await FilterBrand.findByIdAndUpdate(id, data, { new: true, runValidators: true });
+    const brand = await FilterBrand.findOneAndUpdate(
+      { _id: id, tenant: tenantId },
+      data,
+      { new: true, runValidators: true }
+    );
     if (!brand) {
       throw new ApiError(404, 'Filter brand not found');
     }
     return brand;
   }
 
-  async toggleFilterBrandStatus(id: string): Promise<IFilterBrandDocument> {
-    const brand = await FilterBrand.findById(id);
+  async toggleFilterBrandStatus(tenantId: string, id: string): Promise<IFilterBrandDocument> {
+    const brand = await FilterBrand.findOne({ _id: id, tenant: tenantId });
     if (!brand) {
       throw new ApiError(404, 'Filter brand not found');
     }
@@ -57,8 +68,8 @@ export class FilterBrandService {
     return brand;
   }
 
-  async deleteFilterBrand(id: string): Promise<void> {
-    const brand = await FilterBrand.findByIdAndDelete(id);
+  async deleteFilterBrand(tenantId: string, id: string): Promise<void> {
+    const brand = await FilterBrand.findOneAndDelete({ _id: id, tenant: tenantId });
     if (!brand) {
       throw new ApiError(404, 'Filter brand not found');
     }

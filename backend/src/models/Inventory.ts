@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { ProductType } from '../types';
 
 export interface IInventoryDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   productType: ProductType;
   name: string;
   stock: number;
@@ -13,11 +14,16 @@ export interface IInventoryDocument extends Document {
 
 const inventorySchema = new Schema<IInventoryDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     productType: {
       type: String,
       enum: Object.values(ProductType),
-      required: [true, 'Product type is required'],
-      index: true
+      required: [true, 'Product type is required']
     },
     name: {
       type: String,
@@ -47,9 +53,11 @@ const inventorySchema = new Schema<IInventoryDocument>(
   }
 );
 
-inventorySchema.index({ productType: 1 });
-inventorySchema.index({ stock: 1 });
-inventorySchema.index({ name: 1 });
+// Compound indexes for multi-tenant queries
+inventorySchema.index({ tenant: 1, createdAt: -1 });
+inventorySchema.index({ tenant: 1, productType: 1 });
+inventorySchema.index({ tenant: 1, stock: 1 });
+inventorySchema.index({ tenant: 1, name: 1 });
 
 // Virtual to check if reorder is needed
 inventorySchema.virtual('needsReorder').get(function() {

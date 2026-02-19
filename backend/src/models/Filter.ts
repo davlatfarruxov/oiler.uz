@@ -2,6 +2,7 @@ import mongoose, { Schema, Document } from 'mongoose';
 import { FilterType } from '../types';
 
 export interface IFilterDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   brandName: string;
   filterType: FilterType;
   partNumber: string; // e.g., "W 712/75"
@@ -20,11 +21,16 @@ export interface IFilterDocument extends Document {
 
 const filterSchema = new Schema<IFilterDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     brandName: {
       type: String,
       required: [true, 'Filter brand name is required'],
-      trim: true,
-      index: true
+      trim: true
     },
     filterType: {
       type: String,
@@ -87,8 +93,11 @@ const filterSchema = new Schema<IFilterDocument>(
   }
 );
 
-filterSchema.index({ brandName: 1, filterType: 1, partNumber: 1 });
-filterSchema.index({ active: 1 });
-filterSchema.index({ stock: 1 });
+// Compound indexes for multi-tenant queries
+filterSchema.index({ tenant: 1, createdAt: -1 });
+filterSchema.index({ tenant: 1, brandName: 1, filterType: 1, partNumber: 1 });
+filterSchema.index({ tenant: 1, filterType: 1 });
+filterSchema.index({ tenant: 1, active: 1 });
+filterSchema.index({ tenant: 1, stock: 1 });
 
 export default mongoose.model<IFilterDocument>('Filter', filterSchema);

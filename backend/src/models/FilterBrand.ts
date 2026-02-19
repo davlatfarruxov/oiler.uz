@@ -1,6 +1,7 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
 export interface IFilterBrandDocument extends Document {
+  tenant: mongoose.Types.ObjectId;
   name: string;
   active: boolean;
   createdAt: Date;
@@ -9,10 +10,15 @@ export interface IFilterBrandDocument extends Document {
 
 const filterBrandSchema = new Schema<IFilterBrandDocument>(
   {
+    tenant: {
+      type: Schema.Types.ObjectId,
+      ref: 'Tenant',
+      required: [true, 'Tenant is required'],
+      index: true
+    },
     name: {
       type: String,
       required: [true, 'Filter brand name is required'],
-      unique: true,
       trim: true
     },
     active: {
@@ -25,7 +31,9 @@ const filterBrandSchema = new Schema<IFilterBrandDocument>(
   }
 );
 
-filterBrandSchema.index({ name: 1 });
-filterBrandSchema.index({ active: 1 });
+// Compound indexes for multi-tenant queries
+filterBrandSchema.index({ tenant: 1, createdAt: -1 });
+filterBrandSchema.index({ tenant: 1, name: 1 }, { unique: true });
+filterBrandSchema.index({ tenant: 1, active: 1 });
 
 export default mongoose.model<IFilterBrandDocument>('FilterBrand', filterBrandSchema);
