@@ -118,22 +118,22 @@ export default function ArchivesPage() {
   }
 
   const handleRestore = async (type: 'vehicle' | 'oilChange' | 'employee', id: string) => {
-    if (!confirm('Are you sure you want to restore this item?')) return
+    if (!confirm('Ushbu elementni tiklashni xohlaysizmi?')) return
 
     try {
       if (type === 'vehicle') {
         await api.post(`/vehicles/${id}/restore`)
-        alert('Vehicle restored successfully')
+        alert('Mashina muvaffaqiyatli tiklandi')
       } else if (type === 'oilChange') {
         await api.post(`/oil-changes/${id}/restore`)
-        alert('Oil change restored successfully')
+        alert('Xizmat muvaffaqiyatli tiklandi')
       } else {
         await api.post(`/employees/${id}/restore`)
-        alert('Employee restored successfully')
+        alert('Xodim muvaffaqiyatli tiklandi')
       }
       fetchArchives()
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to restore item')
+      alert(error.response?.data?.message || 'Elementni tiklashda xatolik')
     }
   }
 
@@ -168,7 +168,7 @@ export default function ArchivesPage() {
       setHistoryData(response.data.data || [])
     } catch (error) {
       console.error('Failed to load history:', error)
-      alert('Failed to load history')
+      alert('Tarixni yuklashda xatolik')
     } finally {
       setLoadingHistory(false)
     }
@@ -209,8 +209,8 @@ export default function ArchivesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Archive</h1>
-          <p className="text-muted-foreground mt-1">View and restore archived vehicles and services</p>
+          <h1 className="text-3xl font-bold text-foreground">Arxiv</h1>
+          <p className="text-muted-foreground mt-1">Arxivlangan mashinalar va xizmatlarni ko'rish va tiklash</p>
         </div>
       </div>
 
@@ -219,20 +219,20 @@ export default function ArchivesPage() {
         <CardContent className="pt-6">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <p className="text-sm text-muted-foreground">Total Archived Items</p>
+              <p className="text-sm text-muted-foreground">Jami arxivlangan elementlar</p>
               {isLoading ? (
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
               ) : (
                 <>
                   <p className="text-2xl font-bold text-foreground mt-2">{totalArchived}</p>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {vehicles.length} vehicles, {oilChanges.length} services, {employees.length} employees
+                    {vehicles.length} mashina, {oilChanges.length} xizmat, {employees.length} xodim
                   </p>
                 </>
               )}
             </div>
-            <div className="p-3 bg-orange-100 rounded-lg">
-              <Archive className="w-6 h-6 text-orange-600" />
+            <div className="p-3 bg-orange-100 dark:bg-orange-950/50 rounded-lg">
+              <Archive className="w-6 h-6 text-orange-600 dark:text-orange-400" />
             </div>
           </div>
         </CardContent>
@@ -243,18 +243,18 @@ export default function ArchivesPage() {
         <CardHeader>
           <div className="flex items-center justify-between">
             <div>
-              <CardTitle>Archived Items</CardTitle>
-              <CardDescription>All archived vehicles and services</CardDescription>
+              <CardTitle>Arxivlangan elementlar</CardTitle>
+              <CardDescription>Barcha arxivlangan mashinalar va xizmatlar</CardDescription>
             </div>
             <Select value={selectedType} onValueChange={setSelectedType}>
               <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Filter by type" />
+                <SelectValue placeholder="Tur bo'yicha filtr" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="Vehicle">Vehicles</SelectItem>
-                <SelectItem value="OilChange">Services</SelectItem>
-                <SelectItem value="Employee">Employees</SelectItem>
+                <SelectItem value="all">Barcha turlar</SelectItem>
+                <SelectItem value="Vehicle">Mashinalar</SelectItem>
+                <SelectItem value="OilChange">Xizmatlar</SelectItem>
+                <SelectItem value="Employee">Xodimlar</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -267,7 +267,7 @@ export default function ArchivesPage() {
           ) : totalArchived === 0 ? (
             <div className="text-center py-8">
               <Archive className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">No archived items found</p>
+              <p className="text-muted-foreground">Arxivlangan elementlar topilmadi</p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -294,11 +294,11 @@ export default function ArchivesPage() {
                             <span className="font-semibold text-foreground">
                               {originalPlateNumber}
                             </span>
-                            <Badge className="bg-blue-100 text-blue-900 border-blue-200">
-                              Vehicle
+                            <Badge className="bg-blue-100 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800">
+                              Mashina
                             </Badge>
                             {isDeleted && (
-                              <Badge className="bg-red-100 text-red-900 border-red-200">
+                              <Badge className="bg-red-100 dark:bg-red-950/50 text-red-900 dark:text-red-200 border-red-200 dark:border-red-800">
                                 Raqam qayta ishlatilgan
                               </Badge>
                             )}
@@ -349,7 +349,7 @@ export default function ArchivesPage() {
                             size="sm"
                             disabled
                             className="gap-2"
-                            title={isDeleted ? "Cannot restore - plate number was reused" : "Cannot restore - plate number already in use"}
+                            title={isDeleted ? "Tiklash mumkin emas - raqam qayta ishlatilgan" : "Tiklash mumkin emas - raqam band"}
                           >
                             <RotateCcw className="w-4 h-4" />
                             {isDeleted ? "Qayta ishlatilgan" : "Raqam band"}
@@ -362,7 +362,7 @@ export default function ArchivesPage() {
                             className="gap-2"
                           >
                             <RotateCcw className="w-4 h-4" />
-                            Restore
+                            Tiklash
                           </Button>
                         )}
                       </div>
@@ -388,12 +388,12 @@ export default function ArchivesPage() {
                               <div key={service._id} className="bg-muted/30 rounded-lg p-3 text-sm">
                                 <div className="flex items-start justify-between mb-2">
                                   <div className="flex items-center gap-2">
-                                    <Droplet className="w-4 h-4 text-blue-600" />
+                                    <Droplet className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                                     <span className="font-semibold">
                                       {new Date(service.createdAt).toLocaleDateString('en-GB')}
                                     </span>
                                     {service.isArchived && (
-                                      <Badge className="bg-orange-100 text-orange-900 border-orange-200 text-xs">
+                                      <Badge className="bg-orange-100 dark:bg-orange-950/50 text-orange-900 dark:text-orange-200 border-orange-200 dark:border-orange-800 text-xs">
                                         Arxivlangan
                                       </Badge>
                                     )}
@@ -484,14 +484,14 @@ export default function ArchivesPage() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 mb-1">
                           <span className="font-semibold text-foreground">
-                            {oilChange.vehicle?.plateNumber || 'Unknown Vehicle'}
+                            {oilChange.vehicle?.plateNumber || 'Noma\'lum mashina'}
                           </span>
-                          <Badge className="bg-green-100 text-green-900 border-green-200">
-                            Service
+                          <Badge className="bg-green-100 dark:bg-green-950/50 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800">
+                            Xizmat
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
-                          {oilChange.vehicle?.brand} {oilChange.vehicle?.vehicleModel} - ${oilChange.price}
+                          {oilChange.vehicle?.brand} {oilChange.vehicle?.vehicleModel} - {oilChange.price?.toLocaleString()} so'm
                         </p>
                         <div className="flex items-center gap-4 text-sm text-muted-foreground mt-2">
                           <div className="flex items-center gap-1">
@@ -524,7 +524,7 @@ export default function ArchivesPage() {
                         className="gap-2"
                       >
                         <RotateCcw className="w-4 h-4" />
-                        Restore
+                        Tiklash
                       </Button>
                     </div>
                   </div>
@@ -547,8 +547,8 @@ export default function ArchivesPage() {
                           <span className="font-semibold text-foreground">
                             {employee.name}
                           </span>
-                          <Badge className="bg-purple-100 text-purple-900 border-purple-200">
-                            Employee
+                          <Badge className="bg-purple-100 dark:bg-purple-950/50 text-purple-900 dark:text-purple-200 border-purple-200 dark:border-purple-800">
+                            Xodim
                           </Badge>
                         </div>
                         <p className="text-sm text-muted-foreground">
@@ -576,7 +576,7 @@ export default function ArchivesPage() {
                         className="gap-2"
                       >
                         <Eye className="w-4 h-4" />
-                        Details
+                        Tafsilotlar
                       </Button>
                       <Button
                         variant="default"
@@ -585,7 +585,7 @@ export default function ArchivesPage() {
                         className="gap-2"
                       >
                         <RotateCcw className="w-4 h-4" />
-                        Restore
+                        Tiklash
                       </Button>
                     </div>
                   </div>
@@ -600,9 +600,9 @@ export default function ArchivesPage() {
       <Dialog open={detailsOpen} onOpenChange={setDetailsOpen}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Archive Details</DialogTitle>
+            <DialogTitle>Arxiv tafsilotlari</DialogTitle>
             <DialogDescription>
-              Complete information about this archived item
+              Ushbu arxivlangan element haqida to'liq ma'lumot
             </DialogDescription>
           </DialogHeader>
           {selectedItem && (
@@ -621,7 +621,7 @@ export default function ArchivesPage() {
       <Dialog open={historyOpen} onOpenChange={setHistoryOpen}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Ta'rix (History)</DialogTitle>
+            <DialogTitle>Ta'rix</DialogTitle>
             <DialogDescription>
               Barcha o'zgarishlar tarixi
             </DialogDescription>
@@ -645,10 +645,10 @@ export default function ArchivesPage() {
                         <Badge 
                           className={
                             entry.action === 'created' 
-                              ? 'bg-green-100 text-green-900 border-green-200'
+                              ? 'bg-green-100 dark:bg-green-950/50 text-green-900 dark:text-green-200 border-green-200 dark:border-green-800'
                               : entry.action === 'updated'
-                              ? 'bg-blue-100 text-blue-900 border-blue-200'
-                              : 'bg-orange-100 text-orange-900 border-orange-200'
+                              ? 'bg-blue-100 dark:bg-blue-950/50 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800'
+                              : 'bg-orange-100 dark:bg-orange-950/50 text-orange-900 dark:text-orange-200 border-orange-200 dark:border-orange-800'
                           }
                         >
                           {entry.action === 'created' ? 'Yaratildi' : entry.action === 'updated' ? 'O\'zgartirildi' : 'Arxivlandi'}
@@ -659,7 +659,7 @@ export default function ArchivesPage() {
                       </div>
                       <div className="flex items-center gap-2 text-sm text-muted-foreground">
                         <User className="w-3 h-3" />
-                        <span>{entry.performedBy?.name || 'Unknown'}</span>
+                        <span>{entry.performedBy?.name || 'Noma\'lum'}</span>
                         <span className="text-xs">({entry.performedBy?.email || 'N/A'})</span>
                       </div>
                     </div>
@@ -683,7 +683,7 @@ export default function ArchivesPage() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Eski qiymat:</p>
-                              <div className="bg-red-50 border border-red-200 rounded p-2">
+                              <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded p-2">
                                 <p className="text-xs text-foreground font-mono break-all">
                                   {change.oldValue === null || change.oldValue === undefined 
                                     ? '(bo\'sh)' 
@@ -695,7 +695,7 @@ export default function ArchivesPage() {
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Yangi qiymat:</p>
-                              <div className="bg-green-50 border border-green-200 rounded p-2">
+                              <div className="bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-800 rounded p-2">
                                 <p className="text-xs text-foreground font-mono break-all">
                                   {change.newValue === null || change.newValue === undefined 
                                     ? '(bo\'sh)' 

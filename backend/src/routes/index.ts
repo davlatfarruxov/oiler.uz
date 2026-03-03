@@ -13,6 +13,7 @@ import filterBrandRoutes from './filterBrandRoutes';
 import archiveRoutes from './archiveRoutes';
 import paymentRoutes from './paymentRoutes';
 import generalServiceRoutes from './generalServiceRoutes';
+import employeePaymentRoutes from './employeePaymentRoutes';
 
 const router = Router();
 
@@ -30,5 +31,6 @@ router.use('/filter-brands', filterBrandRoutes);
 router.use('/archives', archiveRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/services', generalServiceRoutes);
+router.use('/employee-payments', employeePaymentRoutes);
 
 export default router;

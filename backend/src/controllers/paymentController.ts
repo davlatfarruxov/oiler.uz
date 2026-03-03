@@ -135,16 +135,18 @@ export class PaymentController {
 
   /**
    * Get customer payment history (ledger)
-   * GET /payments/customer/:customerId/history
+   * GET /payments/customer/:customerId/history?page=1&limit=20
    */
   async getCustomerPaymentHistory(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tenantId = req.user!.tenantId;
       const { customerId } = req.params;
+      const page = parseInt(req.query.page as string) || 1;
+      const limit = parseInt(req.query.limit as string) || 20;
 
-      const history = await paymentService.getCustomerPaymentHistory(tenantId, customerId);
+      const result = await paymentService.getCustomerPaymentHistory(tenantId, customerId, page, limit);
       
-      res.status(200).json(ApiResponse.success('Payment history retrieved', history));
+      res.status(200).json(ApiResponse.success('Payment history retrieved', result));
     } catch (error) {
       next(error);
     }

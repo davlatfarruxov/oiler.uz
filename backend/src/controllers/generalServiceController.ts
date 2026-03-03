@@ -25,12 +25,13 @@ export class GeneralServiceController {
   async listServices(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
     try {
       const tenantId = req.user!.tenantId;
-      const { vehicleId, customerId, paymentStatus } = req.query;
+      const { vehicleId, customerId, paymentStatus, status } = req.query;
 
       const services = await serviceService.listServices(tenantId, {
         vehicleId: vehicleId as string,
         customerId: customerId as string,
-        paymentStatus: paymentStatus as 'paid' | 'partial' | 'unpaid'
+        paymentStatus: paymentStatus as 'paid' | 'partial' | 'unpaid',
+        status: status as 'active' | 'completed'
       });
 
       res.status(200).json(ApiResponse.success('Services retrieved successfully', services));
@@ -109,6 +110,20 @@ export class GeneralServiceController {
       const history = await serviceService.getServiceHistory(tenantId, serviceId);
 
       res.status(200).json(ApiResponse.success('Service history retrieved successfully', history));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async completeService(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.id;
+      const serviceId = req.params.id;
+
+      const completedService = await serviceService.completeService(tenantId, serviceId, userId);
+
+      res.status(200).json(ApiResponse.success('Service completed successfully', completedService));
     } catch (error) {
       next(error);
     }

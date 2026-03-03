@@ -1,5 +1,8 @@
 import Employee, { IEmployeeDocument } from '../models/Employee';
 import OilChange from '../models/OilChange';
+import Service from '../models/Service';
+import Settings from '../models/Settings';
+import EmployeePayment from '../models/EmployeePayment';
 import { ApiError } from '../utils/ApiError';
 import { UserRole } from '../types';
 import mongoose from 'mongoose';
@@ -359,6 +362,346 @@ export class EmployeeService {
       limit,
       totalPages: Math.ceil(totalItems / limit),
       totalItems
+    };
+  }
+
+  async getEmployeeServices(
+    tenantId: string, 
+    employeeId: string, 
+    filters: {
+      startDate?: Date;
+      endDate?: Date;
+      serviceType?: 'oilChange' | 'service' | 'all';
+      paymentStatus?: 'paid' | 'partial' | 'unpaid' | 'all';
+      page?: number;
+      limit?: number;
+    }
+  ): Promise<any> {
+    const page = filters.page || 1;
+    const limit = filters.limit || 20;
+    const skip = (page - 1) * limit;
+
+    // Verify employee exists
+    await this.getEmployeeById(tenantId, employeeId);
+
+    const Service = require('../models/Service').default;
+    const Settings = require('../models/Settings').default;
+
+    // Get commission rate from settings
+    const settings = await Settings.findOne({ tenant: tenantId });
+    const commissionRate = settings?.employeeCommissionRate || 30;
+
+    // Build match query
+    const matchQuery: any = {
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      employees: new mongoose.Types.ObjectId(employeeId),
+      isArchived: { $ne: true }
+    };
+
+    if (filters.startDate || filters.endDate) {
+      matchQuery.createdAt = {};
+      if (filters.startDate) matchQuery.createdAt.$gte = filters.startDate;
+      if (filters.endDate) matchQuery.createdAt.$lte = filters.endDate;
+    }
+
+    if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+      matchQuery.paymentStatus = filters.paymentStatus;
+    }
+
+    // Fetch oil changes
+    let oilChanges: any[] = [];
+    if (!filters.serviceType || filters.serviceType === 'all' || filters.serviceType === 'oilChange') {
+      oilChanges = await OilChange.find(matchQuery)
+        .populate('vehicle', 'plateNumber brand vehicleModel')
+        .populate('customer', 'name phone')
+        .populate('employees', 'name')
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
+    // Fetch general services
+    let generalServices: any[] = [];
+    if (!filters.serviceType || filters.serviceType === 'all' || filters.serviceType === 'service') {
+      const serviceMatchQuery = {
+        tenant: new mongoose.Types.ObjectId(tenantId),
+        'services.employees': new mongoose.Types.ObjectId(employeeId),
+        isArchived: { $ne: true }
+      };
+
+      if (filters.startDate || filters.endDate) {
+        serviceMatchQuery['createdAt'] = {};
+        if (filters.startDate) serviceMatchQuery['createdAt'].$gte = filters.startDate;
+        if (filters.endDate) serviceMatchQuery['createdAt'].$lte = filters.endDate;
+      }
+
+      if (filters.paymentStatus && filters.paymentStatus !== 'all') {
+        serviceMatchQuery['paymentStatus'] = filters.paymentStatus;
+      }
+
+      generalServices = await Service.find(serviceMatchQuery)
+        .populate('vehicle', 'plateNumber brand vehicleModel')
+        .populate('customer', 'name phone')
+        .populate('services.employees', 'name')
+        .sort({ createdAt: -1 })
+        .lean();
+    }
+
+    // Format oil changes
+    const formattedOilChanges = oilChanges.map((service: any) => {
+      const employeeCount = service.employees?.length || 1;
+      const commission = (service.price * commissionRate / 100) / employeeCount;
+
+      return {
+        _id: service._id,
+        type: 'oilChange',
+        date: service.createdAt,
+        vehicle: service.vehicle,
+        customer: service.customer,
+        serviceName: 'Moy almashtirish',
+        price: service.price,
+        paymentStatus: service.paymentStatus,
+        amountPaid: service.amountPaid,
+        amountDue: service.amountDue,
+        employees: service.employees,
+        employeeCount,
+        commission: Math.round(commission),
+        commissionRate
+      };
+    });
+
+    // Format general services
+    const formattedGeneralServices = generalServices.map((service: any) => {
+      // Count how many services this employee participated in
+      let employeeServiceCount = 0;
+      let totalCommission = 0;
+
+      service.services.forEach((s: any) => {
+        const isInService = s.employees.some((e: any) => e._id.toString() === employeeId);
+        if (isInService) {
+          employeeServiceCount++;
+          const employeeCount = s.employees.length;
+          const serviceCommission = (s.totalPrice * commissionRate / 100) / employeeCount;
+          totalCommission += serviceCommission;
+        }
+      });
+
+      return {
+        _id: service._id,
+        type: 'service',
+        date: service.createdAt,
+        vehicle: service.vehicle,
+        customer: service.customer,
+        serviceName: `Ish sessiyasi (${employeeServiceCount} ta xizmat)`,
+        price: service.totalPrice,
+        paymentStatus: service.paymentStatus,
+        amountPaid: service.amountPaid,
+        amountDue: service.amountDue,
+        status: service.status,
+        services: service.services,
+        employeeServiceCount,
+        commission: Math.round(totalCommission),
+        commissionRate
+      };
+    });
+
+    // Merge and sort
+    const allServices = [...formattedOilChanges, ...formattedGeneralServices]
+      .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+    // Paginate
+    const paginatedServices = allServices.slice(skip, skip + limit);
+    const totalItems = allServices.length;
+
+    // Calculate totals
+    const totalServices = allServices.length;
+    const totalRevenue = allServices.reduce((sum, s) => sum + s.price, 0);
+    const totalCommission = allServices.reduce((sum, s) => sum + s.commission, 0);
+
+    return {
+      services: paginatedServices,
+      pagination: {
+        page,
+        limit,
+        totalPages: Math.ceil(totalItems / limit),
+        totalItems
+      },
+      summary: {
+        totalServices,
+        totalRevenue,
+        totalCommission,
+        commissionRate
+      }
+    };
+  }
+
+  async getEmployeeStatistics(tenantId: string, employeeId: string): Promise<any> {
+    await this.getEmployeeById(tenantId, employeeId);
+
+    const Service = require('../models/Service').default;
+    const Settings = require('../models/Settings').default;
+
+    const settings = await Settings.findOne({ tenant: tenantId });
+    const commissionRate = settings?.employeeCommissionRate || 30;
+
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    const monthEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0, 23, 59, 59);
+
+    // All time stats
+    const allTimeOilChanges = await OilChange.countDocuments({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      employees: new mongoose.Types.ObjectId(employeeId),
+      isArchived: { $ne: true }
+    });
+
+    const allTimeGeneralServices = await Service.countDocuments({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      'services.employees': new mongoose.Types.ObjectId(employeeId),
+      isArchived: { $ne: true }
+    });
+
+    // This month stats
+    const monthOilChanges = await OilChange.find({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      employees: new mongoose.Types.ObjectId(employeeId),
+      createdAt: { $gte: monthStart, $lte: monthEnd },
+      isArchived: { $ne: true }
+    }).lean();
+
+    const monthGeneralServices = await Service.find({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      'services.employees': new mongoose.Types.ObjectId(employeeId),
+      createdAt: { $gte: monthStart, $lte: monthEnd },
+      isArchived: { $ne: true }
+    }).lean();
+
+    // Calculate month revenue and commission
+    let monthRevenue = 0;
+    let monthCommission = 0;
+
+    monthOilChanges.forEach((service: any) => {
+      monthRevenue += service.price;
+      const employeeCount = service.employees?.length || 1;
+      monthCommission += (service.price * commissionRate / 100) / employeeCount;
+    });
+
+    monthGeneralServices.forEach((service: any) => {
+      monthRevenue += service.totalPrice;
+      service.services.forEach((s: any) => {
+        const isInService = s.employees.some((e: any) => e.toString() === employeeId);
+        if (isInService) {
+          const employeeCount = s.employees.length;
+          monthCommission += (s.totalPrice * commissionRate / 100) / employeeCount;
+        }
+      });
+    });
+
+    // All time revenue and commission
+    const allOilChanges = await OilChange.find({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      employees: new mongoose.Types.ObjectId(employeeId),
+      isArchived: { $ne: true }
+    }).lean();
+
+    const allGeneralServices = await Service.find({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      'services.employees': new mongoose.Types.ObjectId(employeeId),
+      isArchived: { $ne: true }
+    }).lean();
+
+    let allTimeRevenue = 0;
+    let allTimeCommission = 0;
+
+    allOilChanges.forEach((service: any) => {
+      allTimeRevenue += service.price;
+      const employeeCount = service.employees?.length || 1;
+      allTimeCommission += (service.price * commissionRate / 100) / employeeCount;
+    });
+
+    allGeneralServices.forEach((service: any) => {
+      allTimeRevenue += service.totalPrice;
+      service.services.forEach((s: any) => {
+        const isInService = s.employees.some((e: any) => e.toString() === employeeId);
+        if (isInService) {
+          const employeeCount = s.employees.length;
+          allTimeCommission += (s.totalPrice * commissionRate / 100) / employeeCount;
+        }
+      });
+    });
+
+    return {
+      allTime: {
+        totalServices: allTimeOilChanges + allTimeGeneralServices,
+        totalRevenue: Math.round(allTimeRevenue),
+        totalCommission: Math.round(allTimeCommission)
+      },
+      thisMonth: {
+        totalServices: monthOilChanges.length + monthGeneralServices.length,
+        totalRevenue: Math.round(monthRevenue),
+        totalCommission: Math.round(monthCommission)
+      },
+      commissionRate
+    };
+  }
+
+  async getTotalEmployeeDebt(tenantId: string): Promise<any> {
+    const employees = await Employee.find({
+      tenant: new mongoose.Types.ObjectId(tenantId),
+      isArchived: { $ne: true }
+    }).lean();
+
+    const settings = await Settings.findOne({ tenant: new mongoose.Types.ObjectId(tenantId) });
+    const commissionRate = settings?.employeeCommissionRate || 30;
+
+    let totalCommission = 0;
+    let totalPaid = 0;
+
+    for (const employee of employees) {
+      // Calculate commission from oil changes
+      const oilChanges = await OilChange.find({
+        tenant: new mongoose.Types.ObjectId(tenantId),
+        employees: employee._id,
+        isArchived: { $ne: true }
+      }).lean();
+
+      oilChanges.forEach((service: any) => {
+        const employeeCount = service.employees?.length || 1;
+        totalCommission += (service.price * commissionRate / 100) / employeeCount;
+      });
+
+      // Calculate commission from general services
+      const generalServices = await Service.find({
+        tenant: new mongoose.Types.ObjectId(tenantId),
+        'services.employees': employee._id,
+        isArchived: { $ne: true }
+      }).lean();
+
+      generalServices.forEach((service: any) => {
+        service.services.forEach((s: any) => {
+          const isInService = s.employees.some((e: any) => e.toString() === employee._id.toString());
+          if (isInService) {
+            const employeeCount = s.employees.length;
+            totalCommission += (s.totalPrice * commissionRate / 100) / employeeCount;
+          }
+        });
+      });
+
+      // Get payments for this employee
+      const payments = await EmployeePayment.find({
+        tenant: new mongoose.Types.ObjectId(tenantId),
+        employee: employee._id
+      }).lean();
+
+      payments.forEach((payment: any) => {
+        totalPaid += payment.amount;
+      });
+    }
+
+    return {
+      totalCommission: Math.round(totalCommission),
+      totalPaid: Math.round(totalPaid),
+      totalDebt: Math.round(totalCommission - totalPaid),
+      employeeCount: employees.length
     };
   }
 }

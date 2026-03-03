@@ -16,6 +16,13 @@ export interface IServiceItem {
   items: IServiceItemItem[];
   laborCost: number;
   employees: mongoose.Types.ObjectId[]; // Each service has its own employees
+  employeeCommissions: Array<{
+    employee: mongoose.Types.ObjectId;
+    commissionRate: number;
+    commissionAmount: number;
+    commissionStatus: 'pending' | 'paid';
+    paidAt?: Date;
+  }>;
   totalPrice: number;
 }
 
@@ -27,12 +34,15 @@ export interface IServiceDocument extends Document {
   services: IServiceItem[]; // Array of services in this work session
   mileage?: number;
   notes?: string;
+  status: 'active' | 'completed';
+  commissionRate: number; // Commission rate at time of service creation
   totalPrice: number;
   paymentStatus: 'paid' | 'partial' | 'unpaid';
   amountPaid: number;
   amountDue: number;
   dueDate?: Date;
   paidAt?: Date;
+  completedAt?: Date;
   isArchived: boolean;
   archivedAt?: Date;
   archivedBy?: mongoose.Types.ObjectId;
@@ -96,6 +106,32 @@ const serviceItemSchema = new Schema({
     type: Schema.Types.ObjectId,
     ref: 'Employee'
   }],
+  employeeCommissions: [{
+    employee: {
+      type: Schema.Types.ObjectId,
+      ref: 'Employee',
+      required: true
+    },
+    commissionRate: {
+      type: Number,
+      required: true,
+      min: 0,
+      max: 100
+    },
+    commissionAmount: {
+      type: Number,
+      required: true,
+      min: 0
+    },
+    commissionStatus: {
+      type: String,
+      enum: ['pending', 'paid'],
+      default: 'pending'
+    },
+    paidAt: {
+      type: Date
+    }
+  }],
   totalPrice: {
     type: Number,
     required: true,
@@ -142,6 +178,19 @@ const serviceSchema = new Schema<IServiceDocument>(
       type: String,
       trim: true
     },
+    status: {
+      type: String,
+      enum: ['active', 'completed'],
+      default: 'active',
+      index: true
+    },
+    commissionRate: {
+      type: Number,
+      required: true,
+      default: 30,
+      min: 0,
+      max: 100
+    },
     totalPrice: {
       type: Number,
       required: true,
@@ -168,6 +217,9 @@ const serviceSchema = new Schema<IServiceDocument>(
       index: true
     },
     paidAt: {
+      type: Date
+    },
+    completedAt: {
       type: Date
     },
     isArchived: {

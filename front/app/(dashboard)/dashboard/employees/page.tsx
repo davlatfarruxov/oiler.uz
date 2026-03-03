@@ -37,6 +37,7 @@ export default function EmployeesPage() {
     try {
       setIsLoading(true)
       const response = await api.get('/employees')
+      console.log('Employees response:', response.data)
       setEmployees(response.data.data)
     } catch (error) {
       console.error('Failed to fetch employees:', error)
@@ -63,10 +64,10 @@ export default function EmployeesPage() {
 
       if (editingEmployee) {
         await api.put(`/employees/${editingEmployee._id}`, newEmployee)
-        alert('Employee updated successfully!')
+        alert('Xodim muvaffaqiyatli yangilandi!')
       } else {
         await api.post('/employees', newEmployee)
-        alert('Employee added successfully!')
+        alert('Xodim muvaffaqiyatli qo\'shildi!')
       }
 
       setNewEmployee({ name: '', email: '', phone: '', role: 'employee' })
@@ -75,22 +76,22 @@ export default function EmployeesPage() {
       fetchEmployees()
       fetchStats()
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to save employee')
+      alert(error.response?.data?.message || 'Xodimni saqlashda xatolik')
     } finally {
       setIsSaving(false)
     }
   }
 
   const handleDeleteEmployee = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this employee?')) return
+    if (!confirm('Haqiqatan ham bu xodimni o\'chirmoqchimisiz?')) return
 
     try {
       await api.delete(`/employees/${id}`)
-      alert('Employee deleted successfully!')
+      alert('Xodim muvaffaqiyatli o\'chirildi!')
       fetchEmployees()
       fetchStats()
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete employee')
+      alert(error.response?.data?.message || 'Xodimni o\'chirishda xatolik')
     }
   }
 
@@ -99,7 +100,7 @@ export default function EmployeesPage() {
       await api.patch(`/employees/${id}/toggle-status`)
       fetchEmployees()
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to toggle status')
+      alert(error.response?.data?.message || 'Holatni o\'zgartirishda xatolik')
     }
   }
 
@@ -118,8 +119,8 @@ export default function EmployeesPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Employees</h1>
-          <p className="text-muted-foreground mt-1">Manage team members and track performance</p>
+          <h1 className="text-3xl font-bold text-foreground">Xodimlar</h1>
+          <p className="text-muted-foreground mt-1">Jamoa a'zolarini boshqarish va ish faoliyatini kuzatish</p>
         </div>
         <Button
           onClick={() => {
@@ -130,7 +131,7 @@ export default function EmployeesPage() {
           className="gap-2"
         >
           <Plus className="w-4 h-4" />
-          Add Employee
+          Xodim qo'shish
         </Button>
       </div>
 
@@ -140,13 +141,13 @@ export default function EmployeesPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total Employees</p>
+                <p className="text-sm text-muted-foreground">Jami xodimlar</p>
                 {isLoading ? (
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
                 ) : (
                   <>
                     <p className="text-2xl font-bold text-foreground mt-2">{employees.length}</p>
-                    <p className="text-xs text-muted-foreground mt-1">{activeEmployees.length} active</p>
+                    <p className="text-xs text-muted-foreground mt-1">{activeEmployees.length} faol</p>
                   </>
                 )}
               </div>
@@ -161,18 +162,18 @@ export default function EmployeesPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total Services</p>
+                <p className="text-sm text-muted-foreground">Jami xizmatlar</p>
                 {isLoading ? (
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
                 ) : (
                   <>
                     <p className="text-2xl font-bold text-foreground mt-2">{totalServices}</p>
-                    <p className="text-xs text-muted-foreground mt-1">This month</p>
+                    <p className="text-xs text-muted-foreground mt-1">Bu oyda</p>
                   </>
                 )}
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-blue-100 dark:bg-blue-950/50 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </CardContent>
@@ -182,18 +183,18 @@ export default function EmployeesPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total Revenue</p>
+                <p className="text-sm text-muted-foreground">Jami daromad</p>
                 {isLoading ? (
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
                 ) : (
                   <>
                     <p className="text-2xl font-bold text-foreground mt-2">${totalRevenue.toLocaleString()}</p>
-                    <p className="text-xs text-muted-foreground mt-1">This month</p>
+                    <p className="text-xs text-muted-foreground mt-1">Bu oyda</p>
                   </>
                 )}
               </div>
-              <div className="p-3 bg-green-100 rounded-lg">
-                <TrendingUp className="w-6 h-6 text-green-600" />
+              <div className="p-3 bg-green-100 dark:bg-green-950/50 rounded-lg">
+                <TrendingUp className="w-6 h-6 text-green-600 dark:text-green-400" />
               </div>
             </div>
           </CardContent>
@@ -203,8 +204,8 @@ export default function EmployeesPage() {
       {/* Employees Table */}
       <Card>
         <CardHeader>
-          <CardTitle>Employee Performance</CardTitle>
-          <CardDescription>Track services and revenue by employee</CardDescription>
+          <CardTitle>Xodimlar ish faoliyati</CardTitle>
+          <CardDescription>Xodimlar bo'yicha xizmatlar va daromadni kuzatish</CardDescription>
         </CardHeader>
         <CardContent>
           {isLoading ? (
@@ -214,26 +215,28 @@ export default function EmployeesPage() {
           ) : employees.length === 0 ? (
             <div className="text-center py-8">
               <AlertCircle className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
-              <p className="text-muted-foreground">No employees found</p>
+              <p className="text-muted-foreground">Xodimlar topilmadi</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-border">
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Name</th>
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">Ism</th>
                     <th className="text-left py-3 px-4 font-semibold text-foreground">Email</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Status</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Commission</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Services</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Revenue</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Started</th>
-                    <th className="text-left py-3 px-4 font-semibold text-foreground">Action</th>
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">Holat</th>
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">Bu oyda</th>
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">Boshlagan</th>
+                    <th className="text-left py-3 px-4 font-semibold text-foreground">Amallar</th>
                   </tr>
                 </thead>
                 <tbody>
                   {employees.map((employee) => (
-                    <tr key={employee._id} className="border-b border-border hover:bg-muted/50 transition-colors">
+                    <tr 
+                      key={employee._id} 
+                      className="border-b border-border hover:bg-muted/50 transition-colors cursor-pointer"
+                      onClick={() => window.location.href = `/dashboard/employees/${employee._id}`}
+                    >
                       <td className="py-3 px-4 font-semibold text-foreground">{employee.name}</td>
                       <td className="py-3 px-4 text-muted-foreground text-sm">{employee.email}</td>
                       <td className="py-3 px-4">
@@ -241,31 +244,27 @@ export default function EmployeesPage() {
                           variant={employee.active ? 'default' : 'outline'}
                           className={
                             employee.active
-                              ? 'bg-green-100 text-green-900 border-green-200 cursor-pointer'
-                              : 'bg-gray-100 text-gray-900 border-gray-200 cursor-pointer'
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-900 dark:text-green-200 border-green-200 dark:border-green-700 cursor-pointer'
+                              : 'bg-gray-100 dark:bg-gray-800/50 text-gray-900 dark:text-gray-300 border-gray-200 dark:border-gray-700 cursor-pointer'
                           }
-                          onClick={() => handleToggleStatus(employee._id)}
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            handleToggleStatus(employee._id)
+                          }}
                         >
-                          {employee.active ? 'Active' : 'Inactive'}
+                          {employee.active ? 'Faol' : 'Faol emas'}
                         </Badge>
                       </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center gap-1">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className="font-semibold text-foreground">{employee.commissionRate || 0}%</span>
+                          <span className="font-semibold text-foreground">{employee.servicesThisMonth || 0}</span>
+                          <span className="text-xs text-muted-foreground">xizmat</span>
                         </div>
-                        {employee.totalCommission > 0 && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            ${employee.totalCommission.toFixed(2)} earned
-                          </p>
-                        )}
                       </td>
-                      <td className="py-3 px-4 font-semibold text-foreground">{employee.servicesThisMonth || 0}</td>
-                      <td className="py-3 px-4 text-foreground font-semibold">${(employee.totalRevenue || 0).toLocaleString()}</td>
                       <td className="py-3 px-4 text-sm text-muted-foreground">
                         {new Date(employee.startDate || employee.createdAt).toLocaleDateString()}
                       </td>
-                      <td className="py-3 px-4 space-x-2">
+                      <td className="py-3 px-4 space-x-2" onClick={(e) => e.stopPropagation()}>
                         <Button
                           variant="ghost"
                           size="sm"
@@ -281,7 +280,7 @@ export default function EmployeesPage() {
                             setOpenDialog(true)
                           }}
                         >
-                          Edit
+                          Tahrirlash
                         </Button>
                         <Button
                           variant="ghost"
@@ -289,7 +288,7 @@ export default function EmployeesPage() {
                           onClick={() => handleDeleteEmployee(employee._id)}
                           className="text-destructive"
                         >
-                          Delete
+                          O'chirish
                         </Button>
                       </td>
                     </tr>
@@ -307,14 +306,14 @@ export default function EmployeesPage() {
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5 text-primary" />
-              Top Performer
+              Eng yaxshi xodim
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               <p className="text-lg font-bold text-foreground">{topPerformer.name}</p>
-              <p className="text-sm text-muted-foreground">{topPerformer.servicesThisMonth} services completed</p>
-              <p className="text-sm text-foreground font-semibold">${topPerformer.totalRevenue} revenue this month</p>
+              <p className="text-sm text-muted-foreground">{topPerformer.servicesThisMonth} ta xizmat bajarildi</p>
+              <p className="text-sm text-foreground font-semibold">${topPerformer.totalRevenue} bu oyda daromad</p>
             </div>
           </CardContent>
         </Card>
@@ -324,15 +323,15 @@ export default function EmployeesPage() {
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingEmployee ? 'Edit Employee' : 'Add New Employee'}</DialogTitle>
-            <DialogDescription>Enter the employee details</DialogDescription>
+            <DialogTitle>{editingEmployee ? 'Xodimni tahrirlash' : 'Yangi xodim qo\'shish'}</DialogTitle>
+            <DialogDescription>Xodim ma'lumotlarini kiriting</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleAddEmployee} className="space-y-4">
             <div>
-              <Label htmlFor="name">Full Name *</Label>
+              <Label htmlFor="name">To'liq ism *</Label>
               <Input
                 id="name"
-                placeholder="John Doe"
+                placeholder="Davlat Farruxov"
                 value={newEmployee.name}
                 onChange={(e) => setNewEmployee({ ...newEmployee, name: e.target.value })}
                 required
@@ -343,17 +342,17 @@ export default function EmployeesPage() {
               <Input
                 id="email"
                 type="email"
-                placeholder="john@oilserve.com"
+                placeholder="davlat@oiler.uz"
                 value={newEmployee.email}
                 onChange={(e) => setNewEmployee({ ...newEmployee, email: e.target.value })}
                 required
               />
             </div>
             <div>
-              <Label htmlFor="phone">Phone *</Label>
+              <Label htmlFor="phone">Telefon *</Label>
               <Input
                 id="phone"
-                placeholder="555-1234"
+                placeholder="+998 90 123 45 67"
                 value={newEmployee.phone}
                 onChange={(e) => setNewEmployee({ ...newEmployee, phone: e.target.value })}
                 required
@@ -361,7 +360,7 @@ export default function EmployeesPage() {
             </div>
             <div>
               <Label htmlFor="commissionRate">
-                Commission Rate: {newEmployee.commissionRate}%
+                Komissiya stavkasi: {newEmployee.commissionRate}%
               </Label>
               <div className="pt-2">
                 <Slider
@@ -375,7 +374,7 @@ export default function EmployeesPage() {
                 />
               </div>
               <p className="text-xs text-muted-foreground mt-2">
-                Employee will receive {newEmployee.commissionRate}% of labor cost from each service
+                Xodim har bir xizmatdan ish haqining {newEmployee.commissionRate}% ini oladi
               </p>
             </div>
             <div className="flex gap-2">
@@ -383,14 +382,14 @@ export default function EmployeesPage() {
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saqlanmoqda...
                   </>
                 ) : (
-                  editingEmployee ? 'Update' : 'Add'
+                  editingEmployee ? 'Yangilash' : 'Qo\'shish'
                 )}
               </Button>
               <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </form>

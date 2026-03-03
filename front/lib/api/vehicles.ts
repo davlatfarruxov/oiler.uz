@@ -12,6 +12,8 @@ export interface UnifiedHistoryItem {
   amountDue: number
   employees: Array<{ _id: string; name: string }>
   mileage?: number
+  status?: 'active' | 'completed' // For general services
+  services?: any[] // For general services
   // Additional fields for display
   oilProduct?: any
   oilFilter?: any

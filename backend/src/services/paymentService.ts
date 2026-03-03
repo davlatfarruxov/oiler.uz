@@ -384,7 +384,15 @@ export class PaymentService {
    * Get payment history (ledger) for a customer
    * Includes both oil changes and services
    */
-  async getCustomerPaymentHistory(tenantId: string, customerId: string): Promise<any[]> {
+  async getCustomerPaymentHistory(
+    tenantId: string, 
+    customerId: string,
+    page: number = 1,
+    limit: number = 20
+  ): Promise<{ transactions: any[], total: number, page: number, totalPages: number }> {
+    // Calculate skip
+    const skip = (page - 1) * limit;
+
     // Get all oil changes, services, and payments
     const [oilChanges, services, payments] = await Promise.all([
       OilChange.find({
@@ -412,11 +420,11 @@ export class PaymentService {
     ]);
 
     // Combine and sort by date
-    const transactions: any[] = [];
+    const allTransactions: any[] = [];
 
     // Add oil changes with service type indicator
     oilChanges.forEach(oc => {
-      transactions.push({
+      allTransactions.push({
         type: 'service',
         serviceType: 'oilChange',
         date: oc.createdAt,
@@ -430,7 +438,7 @@ export class PaymentService {
 
     // Add services with service type indicator
     services.forEach(s => {
-      transactions.push({
+      allTransactions.push({
         type: 'service',
         serviceType: 'service',
         serviceName: s.serviceName,
@@ -445,7 +453,7 @@ export class PaymentService {
 
     // Add payments with service type indicator
     payments.forEach(p => {
-      transactions.push({
+      allTransactions.push({
         type: 'payment',
         serviceType: p.serviceType,
         date: p.paymentDate,
@@ -459,19 +467,29 @@ export class PaymentService {
     });
 
     // Sort by date descending
-    transactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+    allTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
-    // Calculate running balance
+    // Calculate running balance for ALL transactions first
     let runningBalance = 0;
-    for (let i = transactions.length - 1; i >= 0; i--) {
-      if (transactions[i].type === 'service') {
-        runningBalance += transactions[i].amount;
+    for (let i = allTransactions.length - 1; i >= 0; i--) {
+      if (allTransactions[i].type === 'service') {
+        runningBalance += allTransactions[i].amount;
       } else {
-        runningBalance -= transactions[i].amount;
+        runningBalance -= allTransactions[i].amount;
       }
-      transactions[i].balance = runningBalance;
+      allTransactions[i].balance = runningBalance;
     }
 
-    return transactions;
+    // Apply pagination
+    const total = allTransactions.length;
+    const totalPages = Math.ceil(total / limit);
+    const transactions = allTransactions.slice(skip, skip + limit);
+
+    return {
+      transactions,
+      total,
+      page,
+      totalPages
+    };
   }
 }

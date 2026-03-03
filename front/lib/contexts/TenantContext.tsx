@@ -55,8 +55,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
   const updateTenant = async (data: Partial<Tenant>) => {
     try {
       setIsLoading(true);
-      // Update tenant via settings API
-      await api.put('/settings/company-info', data);
+      // Update tenant via settings API (company-info endpoint)
+      await api.put('/settings/company', data);
       
       // Refresh tenant data
       await refreshTenant();

@@ -560,13 +560,15 @@ export class VehicleService {
         type: 'oilChange',
         date: change.createdAt,
         serviceName: 'Oil Change',
+        status: change.status, // Add status field
+        completedAt: change.completedAt, // Add completedAt field
         oilProduct: oilProductDisplay,
         oilFilter: formatFilter(change.oilFilter),
         airFilter: formatFilter(change.airFilter),
         cabinFilter: formatFilter(change.cabinFilter),
         fuelFilter: formatFilter(change.fuelFilter),
         items: this.formatOilChangeItems(change),
-        price: change.totalPrice,
+        price: change.price,
         paymentStatus: change.paymentStatus,
         amountDue: change.amountDue,
         amountPaid: change.amountPaid,
@@ -581,6 +583,7 @@ export class VehicleService {
       id: service._id,
       type: 'service',
       date: service.createdAt,
+      status: service.status, // Add status field
       services: service.services, // Include all services in the work session
       price: service.totalPrice,
       paymentStatus: service.paymentStatus,
@@ -631,5 +634,67 @@ export class VehicleService {
     }
 
     return items;
+  }
+
+  async getActiveServices(tenantId: string): Promise<any[]> {
+    const mongoose = require('mongoose');
+    const Service = require('../models/Service').default;
+
+    // Query all active oil changes
+    const activeOilChanges = await OilChange.find({ 
+      tenant: tenantId,
+      status: 'active',
+      isArchived: { $ne: true }
+    })
+      .populate('vehicle', 'plateNumber brand vehicleModel')
+      .populate('customer', 'name phone')
+      .populate('employees', 'name')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Query all active general services
+    const activeGeneralServices = await Service.find({ 
+      tenant: tenantId,
+      status: 'active',
+      isArchived: { $ne: true }
+    })
+      .populate('vehicle', 'plateNumber brand vehicleModel')
+      .populate('customer', 'name phone')
+      .sort({ createdAt: -1 })
+      .lean();
+
+    // Map oil changes to unified format
+    const oilChangeServices = activeOilChanges.map((change: any) => ({
+      _id: change._id,
+      type: 'oilChange',
+      vehicle: change.vehicle,
+      customer: change.customer,
+      employees: change.employees,
+      createdAt: change.createdAt,
+      status: change.status,
+      paymentStatus: change.paymentStatus,
+      price: change.price,
+      mileage: change.mileage
+    }));
+
+    // Map general services to unified format
+    const generalServices = activeGeneralServices.map((service: any) => ({
+      _id: service._id,
+      type: 'service',
+      vehicle: service.vehicle,
+      customer: service.customer,
+      createdAt: service.createdAt,
+      status: service.status,
+      paymentStatus: service.paymentStatus,
+      totalPrice: service.totalPrice,
+      mileage: service.mileage
+    }));
+
+    // Merge and sort by date descending
+    const allActiveServices = [...oilChangeServices, ...generalServices].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+
+    return allActiveServices;
   }
 }

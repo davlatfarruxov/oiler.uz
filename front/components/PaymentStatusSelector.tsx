@@ -98,13 +98,13 @@ export function PaymentStatusSelector({
           <>
             <div className="flex justify-between text-sm">
               <span className="text-muted-foreground">To'langan:</span>
-              <span className="font-medium text-green-600">
+              <span className="font-medium text-green-600 dark:text-green-500">
                 {(paymentStatus === 'paid' ? totalPrice : Number(amountPaid) || 0).toLocaleString()} so'm
               </span>
             </div>
             <div className="flex justify-between text-sm border-t pt-2">
               <span className="text-muted-foreground">Qarz:</span>
-              <span className="font-semibold text-orange-600">
+              <span className="font-semibold text-orange-600 dark:text-orange-500">
                 {(paymentStatus === 'paid' ? 0 : amountDue).toLocaleString()} so'm
               </span>
             </div>
@@ -114,7 +114,7 @@ export function PaymentStatusSelector({
         {paymentStatus === 'unpaid' && (
           <div className="flex justify-between text-sm border-t pt-2">
             <span className="text-muted-foreground">Qarz:</span>
-            <span className="font-semibold text-red-600">
+            <span className="font-semibold text-red-600 dark:text-red-500">
               {totalPrice.toLocaleString()} so'm
             </span>
           </div>

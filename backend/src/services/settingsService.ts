@@ -1,5 +1,6 @@
 import Settings, { ISettings } from '../models/Settings';
 import User from '../models/User';
+import Tenant from '../models/Tenant';
 import { ApiError } from '../utils/ApiError';
 
 interface UpdateCompanyData {
@@ -38,17 +39,22 @@ export class SettingsService {
     return settings;
   }
 
-  async updateCompanyInfo(tenantId: string, data: UpdateCompanyData): Promise<ISettings> {
-    let settings = await Settings.findOne({ tenant: tenantId });
-    
-    if (!settings) {
-      settings = await Settings.create({ tenant: tenantId, ...data });
-    } else {
-      Object.assign(settings, data);
-      await settings.save();
+  async updateCompanyInfo(tenantId: string, data: UpdateCompanyData): Promise<any> {
+    // Update Tenant model instead of Settings
+    const tenant = await Tenant.findById(tenantId);
+    if (!tenant) {
+      throw new ApiError(404, 'Tenant not found');
     }
     
-    return settings;
+    // Update tenant fields
+    if (data.companyName !== undefined) tenant.companyName = data.companyName;
+    if (data.businessEmail !== undefined) tenant.businessEmail = data.businessEmail;
+    if (data.businessPhone !== undefined) tenant.businessPhone = data.businessPhone;
+    if (data.address !== undefined) tenant.address = data.address;
+    
+    await tenant.save();
+    
+    return tenant;
   }
 
   async updateServiceDefaults(tenantId: string, data: UpdateServiceDefaultsData): Promise<ISettings> {
@@ -137,5 +143,29 @@ export class SettingsService {
     
     user.password = data.newPassword;
     await user.save();
+  }
+
+  async getPublicSettings(tenantId?: string): Promise<any> {
+    // Get tenant by ID or first tenant
+    const tenant = tenantId 
+      ? await Tenant.findById(tenantId).lean()
+      : await Tenant.findOne().lean();
+    
+    if (!tenant) {
+      return {
+        companyName: 'OILER.UZ',
+        businessPhone: '',
+        businessEmail: '',
+        address: ''
+      };
+    }
+    
+    // Return only public fields from Tenant
+    return {
+      companyName: tenant.companyName || 'OILER.UZ',
+      businessPhone: tenant.businessPhone || '',
+      businessEmail: tenant.businessEmail || '',
+      address: tenant.address || ''
+    };
   }
 }

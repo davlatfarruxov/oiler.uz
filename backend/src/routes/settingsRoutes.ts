@@ -5,7 +5,10 @@ import { authenticate } from '../middlewares/auth';
 const router = Router();
 const settingsController = new SettingsController();
 
-// All routes require authentication
+// Public routes (no authentication required)
+router.get('/public', settingsController.getPublicSettings.bind(settingsController));
+
+// All other routes require authentication
 router.use(authenticate);
 
 // Settings routes

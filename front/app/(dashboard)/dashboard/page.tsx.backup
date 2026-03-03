@@ -133,37 +133,37 @@ export default function DashboardPage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Bosh sahifa</h1>
-        <p className="text-muted-foreground mt-1">Xush kelibsiz, {user?.name}!</p>
+        <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
+        <p className="text-muted-foreground mt-1">Welcome back, {user?.name}!</p>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
-          title="Bugungi xizmatlar"
+          title="Today's Services"
           value={stats.todayServices}
           icon={Wrench}
-          description={stats.todayServices > 0 ? "Bugun bajarilgan xizmatlar" : "Hali xizmat yo'q"}
+          description={stats.todayServices > 0 ? "Services completed today" : "No services yet"}
           isLoading={isLoading}
         />
         <StatCard
-          title="Jami mashinalar"
+          title="Total Vehicles"
           value={stats.totalVehicles}
           icon={Car}
-          description={stats.totalVehicles > 0 ? "Ro'yxatdan o'tgan mashinalar" : "Hali mashina yo'q"}
+          description={stats.totalVehicles > 0 ? "Registered vehicles" : "No vehicles yet"}
           isLoading={isLoading}
         />
         <StatCard
-          title="Oylik daromad"
-          value={`${(stats.monthlyRevenue || 0).toLocaleString()}`}
+          title="Monthly Revenue"
+          value={`$${(stats.monthlyRevenue || 0).toLocaleString()}`}
           icon={DollarSign}
-          description="Shu oy"
+          description="This month"
           isLoading={isLoading}
         />
         <StatCard
-          title="Kam qolgan mahsulotlar"
+          title="Low Stock Alerts"
           value={stats.lowStockAlerts}
           icon={AlertCircle}
-          description={stats.lowStockAlerts > 0 ? "Mahsulotlar tugamoqda" : "Barcha mahsulotlar yetarli"}
+          description={stats.lowStockAlerts > 0 ? "Items need reorder" : "All items in stock"}
           isLoading={isLoading}
         />
       </div>

@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Loader2, Printer, Trash2, History, Edit } from 'lucide-react'
 import { getVehicleHistory, UnifiedHistoryItem } from '@/lib/api/vehicles'
 import { toast } from 'sonner'
+import { formatDate } from '@/lib/utils/dateFormat'
 
 interface UnifiedServiceHistoryProps {
   vehicleId: string
@@ -14,6 +15,8 @@ interface UnifiedServiceHistoryProps {
   onDelete: (id: string, type: 'oilChange' | 'service') => void
   onPrint: (id: string, type: 'oilChange' | 'service') => void
   onViewHistory: (id: string, type: 'oilChange' | 'service') => void
+  onComplete?: (id: string) => void
+  onRefresh?: () => void
 }
 
 export function UnifiedServiceHistory({
@@ -21,7 +24,9 @@ export function UnifiedServiceHistory({
   onEdit,
   onDelete,
   onPrint,
-  onViewHistory
+  onViewHistory,
+  onComplete,
+  onRefresh
 }: UnifiedServiceHistoryProps) {
   const [history, setHistory] = useState<UnifiedHistoryItem[]>([])
   const [isLoading, setIsLoading] = useState(true)
@@ -51,21 +56,32 @@ export function UnifiedServiceHistory({
   const getPaymentStatusBadge = (status: string) => {
     switch (status) {
       case 'paid':
-        return <Badge variant="default" className="bg-green-600">To'langan</Badge>
+        return <Badge variant="default" className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800">To'langan</Badge>
       case 'partial':
         return <Badge variant="secondary">Qisman</Badge>
       case 'unpaid':
-        return <Badge variant="destructive">To'lanmagan</Badge>
+        return <Badge variant="destructive" className="bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800">To'lanmagan</Badge>
       default:
         return <Badge variant="outline">{status}</Badge>
     }
   }
 
+  const getServiceStatusBadge = (status: string) => {
+    switch (status) {
+      case 'active':
+        return <Badge variant="outline" className="bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-400 border-yellow-400 dark:border-yellow-600">Faol</Badge>
+      case 'completed':
+        return <Badge variant="outline" className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 border-green-400 dark:border-green-600">Tugallangan</Badge>
+      default:
+        return null
+    }
+  }
+
   const getTypeBadge = (type: string) => {
     if (type === 'oilChange') {
-      return <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200">Moy almashtirish</Badge>
+      return <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">Moy almashtirish</Badge>
     } else {
-      return <Badge variant="outline" className="bg-purple-50 text-purple-700 border-purple-200">Ish sessiyasi</Badge>
+      return <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">Ish sessiyasi</Badge>
     }
   }
 
@@ -134,11 +150,12 @@ export function UnifiedServiceHistory({
                 <div className="space-y-2">
                   <div className="flex items-center gap-2">
                     {getTypeBadge(item.type)}
+                    {item.status && getServiceStatusBadge(item.status)}
                     {getPaymentStatusBadge(item.paymentStatus)}
                   </div>
                   
                   <div className="text-sm text-muted-foreground">
-                    <span>{new Date(item.date).toLocaleDateString('uz-UZ')}</span>
+                    <span>{formatDate(item.date)}</span>
                     {item.mileage && (
                       <span className="ml-3">• {item.mileage.toLocaleString()} km</span>
                     )}
@@ -146,6 +163,16 @@ export function UnifiedServiceHistory({
                 </div>
 
                 <div className="flex gap-1">
+                  {item.status === 'active' && onComplete && (
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => onComplete(item.id)}
+                      className="bg-green-600 hover:bg-green-700"
+                    >
+                      Tugatish
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
@@ -281,7 +308,7 @@ export function UnifiedServiceHistory({
                   {item.amountDue > 0 && (
                     <div className="text-sm">
                       <span className="text-muted-foreground">Qarz: </span>
-                      <span className="font-semibold text-destructive">
+                      <span className="font-semibold text-red-600 dark:text-red-500">
                         {(item.amountDue || 0).toLocaleString()} so'm
                       </span>
                     </div>

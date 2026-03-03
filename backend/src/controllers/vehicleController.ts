@@ -164,4 +164,14 @@ export class VehicleController {
       next(error);
     }
   }
+
+  async getActiveServices(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const activeServices = await vehicleService.getActiveServices(tenantId);
+      res.status(200).json(ApiResponse.success('Active services retrieved', activeServices));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

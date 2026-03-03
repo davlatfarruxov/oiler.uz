@@ -158,4 +158,24 @@ export class OilChangeController {
       next(error);
     }
   }
+
+  async completeOilChange(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const userId = req.user!.id;
+      const oilChange = await oilChangeService.completeOilChange(tenantId, req.params.id, userId);
+      res.status(200).json(ApiResponse.success('Oil change completed successfully', oilChange));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getOilChangeByIdPublic(req: any, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const oilChange = await oilChangeService.getOilChangeByIdPublic(req.params.id);
+      res.status(200).json(ApiResponse.success('Oil change retrieved', oilChange));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

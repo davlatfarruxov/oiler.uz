@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import api from '@/lib/api/axios'
+import { useTenant } from '@/lib/contexts/TenantContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -20,10 +21,14 @@ import { PaymentRecordingDialog } from '@/components/PaymentRecordingDialog'
 import { AddServiceDialog } from '@/components/AddServiceDialog'
 import { UnifiedServiceHistory } from '@/components/UnifiedServiceHistory'
 import { EditServiceDialog } from '@/components/EditServiceDialog'
+import QRCode from 'qrcode'
+
 
 export default function VehicleDetailPage() {
+  
   const params = useParams()
   const router = useRouter()
+  const { tenant } = useTenant()
   const [data, setData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [showOilChangeDialog, setShowOilChangeDialog] = useState(false)
@@ -37,6 +42,7 @@ export default function VehicleDetailPage() {
   const [showA4Print, setShowA4Print] = useState(false)
   const [printServiceData, setPrintServiceData] = useState<any>(null)
   const [companySettings, setCompanySettings] = useState<any>(null)
+  const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [showAdditionalProducts, setShowAdditionalProducts] = useState(false)
   const [showEditVehicle, setShowEditVehicle] = useState(false)
@@ -65,9 +71,16 @@ export default function VehicleDetailPage() {
   // Payment history state
   const [paymentHistory, setPaymentHistory] = useState<any[]>([])
   const [loadingPaymentHistory, setLoadingPaymentHistory] = useState(false)
+  const [paymentHistoryPage, setPaymentHistoryPage] = useState(1)
+  const [paymentHistoryTotalPages, setPaymentHistoryTotalPages] = useState(1)
+  const [paymentHistoryTotal, setPaymentHistoryTotal] = useState(0)
   
   // Payment recording dialog state
   const [showPaymentDialog, setShowPaymentDialog] = useState(false)
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false)
+  const [completingServiceId, setCompletingServiceId] = useState<string>('')
+  const [completingServiceData, setCompletingServiceData] = useState<any>(null)
+  const [qrCodeDataUrl, setQrCodeDataUrl] = useState<string>('')
 
   // Form data from backend
   const [oilFilters, setOilFilters] = useState<any[]>([])
@@ -162,8 +175,7 @@ export default function VehicleDetailPage() {
       const response = await api.get(`/payments/customer/${customerId}/summary`)
       setDebtSummary(response.data.data)
       
-      // Also fetch payment history
-      fetchPaymentHistory(customerId)
+      // Don't fetch payment history here - it will be lazy loaded when dropdown opens
     } catch (error) {
       console.error('Failed to load debt summary:', error)
     } finally {
@@ -171,17 +183,29 @@ export default function VehicleDetailPage() {
     }
   }
 
-  const fetchPaymentHistory = async (customerId: string) => {
+  const fetchPaymentHistory = async (customerId: string, page: number = 1) => {
     try {
       setLoadingPaymentHistory(true)
-      const response = await api.get(`/payments/customer/${customerId}/history`)
-      setPaymentHistory(response.data.data || [])
+      const response = await api.get(`/payments/customer/${customerId}/history?page=${page}&limit=20`)
+      const result = response.data.data
+      
+      setPaymentHistory(result.transactions || [])
+      setPaymentHistoryPage(result.page || 1)
+      setPaymentHistoryTotalPages(result.totalPages || 1)
+      setPaymentHistoryTotal(result.total || 0)
     } catch (error) {
       console.error('Failed to load payment history:', error)
     } finally {
       setLoadingPaymentHistory(false)
     }
   }
+
+  // Lazy load payment history when dropdown opens
+  useEffect(() => {
+    if (showPaymentHistory && data?.vehicle?.customer?._id && paymentHistory.length === 0) {
+      fetchPaymentHistory(data.vehicle.customer._id, 1)
+    }
+  }, [showPaymentHistory])
 
   const handleDeleteVehicle = async () => {
     if (!confirm('Are you sure you want to delete this vehicle? It will be moved to archive.')) return
@@ -244,6 +268,159 @@ export default function VehicleDetailPage() {
       setLoadingHistory(false)
     }
   }
+
+  const handleCompleteService = async (serviceId: string) => {
+    try {
+      // First, try to fetch as general service
+      try {
+        const response = await api.get(`/services/${serviceId}`)
+        const serviceData = response.data.data
+        
+        setCompletingServiceId(serviceId)
+        setCompletingServiceData({ ...serviceData, type: 'service' })
+        setShowCompleteDialog(true)
+        return
+      } catch (error: any) {
+        // If not found as general service, try as oil change
+        if (error.response?.status === 404) {
+          const response = await api.get(`/oil-changes/${serviceId}`)
+          const oilChangeData = response.data.data
+          
+          // Transform oil change data to match dialog format
+          const items = []
+          
+          if (oilChangeData.oilProduct) {
+            items.push({
+              itemName: `Moy: ${oilChangeData.oilProduct.brand || ''} ${oilChangeData.oilProduct.viscosity || ''}`,
+              quantity: oilChangeData.oilQuantityUsed || 0,
+              unitPrice: oilChangeData.oilProduct.volume > 0 
+                ? (oilChangeData.oilProduct.price || 0) / oilChangeData.oilProduct.volume 
+                : 0
+            })
+          }
+          
+          if (oilChangeData.oilFilter) {
+            items.push({
+              itemName: `Moy filteri: ${oilChangeData.oilFilter.brand || ''} ${oilChangeData.oilFilter.partNumber || ''}`,
+              quantity: 1,
+              unitPrice: oilChangeData.oilFilter.price || 0
+            })
+          }
+          
+          if (oilChangeData.airFilter) {
+            items.push({
+              itemName: `Havo filteri: ${oilChangeData.airFilter.brand || ''} ${oilChangeData.airFilter.partNumber || ''}`,
+              quantity: 1,
+              unitPrice: oilChangeData.airFilter.price || 0
+            })
+          }
+          
+          if (oilChangeData.cabinFilter) {
+            items.push({
+              itemName: `Salon filteri: ${oilChangeData.cabinFilter.brand || ''} ${oilChangeData.cabinFilter.partNumber || ''}`,
+              quantity: 1,
+              unitPrice: oilChangeData.cabinFilter.price || 0
+            })
+          }
+          
+          if (oilChangeData.fuelFilter) {
+            items.push({
+              itemName: `Yoqilg'i filteri: ${oilChangeData.fuelFilter.brand || ''} ${oilChangeData.fuelFilter.partNumber || ''}`,
+              quantity: 1,
+              unitPrice: oilChangeData.fuelFilter.price || 0
+            })
+          }
+          
+          const transformedData = {
+            type: 'oilChange',
+            mileage: oilChangeData.mileage || 0,
+            totalPrice: oilChangeData.price || 0,
+            paymentStatus: oilChangeData.paymentStatus || 'unpaid',
+            amountPaid: oilChangeData.amountPaid || 0,
+            amountDue: oilChangeData.amountDue || 0,
+            notes: '',
+            services: [{
+              serviceName: 'Moy almashtirish',
+              laborCost: oilChangeData.laborCost || 0,
+              items: items,
+              employees: oilChangeData.employees || [],
+              totalPrice: oilChangeData.price || 0
+            }]
+          }
+          
+          setCompletingServiceId(serviceId)
+          setCompletingServiceData(transformedData)
+          setShowCompleteDialog(true)
+          return
+        }
+        throw error
+      }
+    } catch (error) {
+      alert('Xizmatni yuklashda xatolik yuz berdi')
+    }
+  }
+
+  const confirmCompleteService = async () => {
+    try {
+      const serviceType = completingServiceData?.type || 'service'
+      const endpoint = serviceType === 'oilChange' 
+        ? `/oil-changes/${completingServiceId}/complete`
+        : `/services/${completingServiceId}/complete`
+      
+      await api.post(endpoint)
+      alert('Xizmat muvaffaqiyatli tugallandi')
+      setShowCompleteDialog(false)
+      setCompletingServiceId('')
+      setCompletingServiceData(null)
+      fetchVehicleData() // Reload data
+    } catch (error: any) {
+      alert(error.response?.data?.message || 'Xizmatni tugatishda xatolik yuz berdi')
+    }
+  }
+
+  const handlePrintA4 = async (serviceId: string, type: 'oilChange' | 'service') => {
+    try {
+      let serviceData
+      
+      if (type === 'oilChange') {
+        const response = await api.get(`/oil-changes/${serviceId}`)
+        serviceData = response.data.data
+        console.log('Oil change data for print:', serviceData)
+        console.log('Oil product:', serviceData.oilProduct)
+        console.log('Oil product type:', typeof serviceData.oilProduct)
+      } else {
+        const response = await api.get(`/services/${serviceId}`)
+        serviceData = response.data.data
+        console.log('Service data for print:', serviceData)
+      }
+      
+      // Generate QR code
+      const publicUrl = `${window.location.origin}/service/${serviceId}`
+      const qrDataUrl = await QRCode.toDataURL(publicUrl, {
+        width: 80,
+        margin: 1,
+        color: {
+          dark: '#000000',
+          light: '#FFFFFF'
+        }
+      })
+      setQrCodeDataUrl(qrDataUrl)
+      
+      setLastServiceData(serviceData)
+      setShowPrintPreview(true) // Show modal to choose format
+    } catch (error) {
+      console.error('Print error:', error)
+      alert('Xizmatni yuklashda xatolik yuz berdi')
+    }
+  }
+
+  const handlePrint = () => {
+    window.print()
+    setShowPrintPreview(false)
+  }
+
+  // DUPLICATE REMOVED - handleViewServiceHistory is already defined earlier in the file
+  // DUPLICATE REMOVED - handleViewGeneralServiceHistory is already defined earlier in the file
 
   const handleDeleteGeneralService = async (serviceId: string) => {
     if (!confirm('Ushbu xizmatni o\'chirmoqchimisiz? U arxivga ko\'chiriladi.')) return
@@ -319,10 +496,9 @@ export default function VehicleDetailPage() {
       const mileage = (document.getElementById('edit-service-mileage') as HTMLInputElement)?.value
       const nextServiceMileage = (document.getElementById('edit-service-next-mileage') as HTMLInputElement)?.value
       const laborCost = (document.getElementById('edit-service-labor') as HTMLInputElement)?.value
-      const price = (document.getElementById('edit-service-price') as HTMLInputElement)?.value
       const oilQuantityUsed = (document.getElementById('edit-oil-quantity') as HTMLInputElement)?.value
 
-      if (!mileage || !nextServiceMileage || !price) {
+      if (!mileage || !nextServiceMileage) {
         alert('Please fill all required fields')
         return
       }
@@ -331,7 +507,6 @@ export default function VehicleDetailPage() {
         mileage: Number(mileage),
         nextServiceMileage: Number(nextServiceMileage),
         laborCost: Number(laborCost) || 0,
-        price: Number(price),
         oilQuantityUsed: Number(oilQuantityUsed) || editingService.oilQuantityUsed
       }
 
@@ -681,11 +856,7 @@ export default function VehicleDetailPage() {
     }
   }
 
-
-
-  const handlePrint = () => {
-    window.print()
-  }
+  // DUPLICATE REMOVED - handlePrint is already defined earlier in the file
 
   const handlePrintService = (service: any) => {
     setLastServiceData({
@@ -707,35 +878,7 @@ export default function VehicleDetailPage() {
     setShowPrintPreview(true)
   }
 
-  const handlePrintA4 = async (id: string, type: 'oilChange' | 'service') => {
-    try {
-      let serviceData
-      
-      if (type === 'oilChange') {
-        const response = await api.get(`/oil-changes/${id}`)
-        serviceData = response.data.data
-      } else {
-        const response = await api.get(`/services/${id}`)
-        serviceData = response.data.data
-      }
-      
-      setPrintServiceData({ ...serviceData, type })
-      setShowA4Print(true)
-      
-      // Wait for state to update and DOM to render, then print
-      setTimeout(() => {
-        window.print()
-        // Close print preview after printing
-        setTimeout(() => {
-          setShowA4Print(false)
-          setPrintServiceData(null)
-        }, 1000)
-      }, 1000)
-    } catch (error) {
-      console.error('Print error:', error)
-      alert('Xizmatni yuklashda xatolik yuz berdi')
-    }
-  }
+  // DUPLICATE REMOVED - handlePrintA4 is already defined earlier in the file
 
   if (isLoading) {
     return (
@@ -767,10 +910,12 @@ export default function VehicleDetailPage() {
         @media print {
           body * {
             visibility: hidden !important;
+            font-family: Tahoma, sans-serif;
           }
           .print-sticker-area,
           .print-sticker-area * {
             visibility: visible !important;
+   
           }
           .print-sticker-area {
             position: absolute !important;
@@ -804,8 +949,12 @@ export default function VehicleDetailPage() {
             display: none !important;
           }
           @page {
-            size: A4;
+            size: 58mm 40mm;
             margin: 0;
+          }
+          .print-sticker-area {
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
           }
         }
       `}} />
@@ -822,34 +971,34 @@ export default function VehicleDetailPage() {
         <div className="flex gap-2">
           <Button className="gap-2" onClick={() => setShowOilChangeDialog(true)}>
             <Plus className="w-4 h-4" />
-            New Oil Change
+            Yangi moy almashtirish
           </Button>
           <Button className="gap-2" variant="outline" onClick={() => setShowServiceDialog(true)}>
             <Plus className="w-4 h-4" />
-            Add Service
+            Xizmat qo'shish
           </Button>
         </div>
       </div>
-
+     
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Total Services</p>
+            <p className="text-sm text-muted-foreground">Jami xizmatlar</p>
             <p className="text-2xl font-bold text-foreground mt-2">{totalServices}</p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Last Service</p>
+            <p className="text-sm text-muted-foreground">Oxirgi xizmat</p>
             <p className="text-lg font-semibold text-foreground mt-2">
-              {lastService ? new Date(lastService.createdAt).toLocaleDateString() : 'Never'}
+              {lastService ? new Date(lastService.createdAt).toLocaleDateString() : 'Hech qachon'}
             </p>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
-            <p className="text-sm text-muted-foreground">Engine Type</p>
-            <Badge variant="outline" className="mt-2 capitalize">{vehicle.engineType}</Badge>
+            <p className="text-sm text-muted-foreground">Dvigatel turi</p>
+            <Badge variant="outline" className="mt-2 capitalize">{vehicle.engineType === 'petrol' ? 'benzin' : vehicle.engineType === 'diesel' ? 'dizel' : vehicle.engineType}</Badge>
           </CardContent>
         </Card>
       </div>
@@ -874,59 +1023,87 @@ export default function VehicleDetailPage() {
         />
       )}
 
-      {/* Payment History Table */}
-      {paymentHistory.length > 0 && (
+      {/* Payment History Table - Collapsible */}
+      {debtSummary && (
         <Card id="payment-history-section">
-          <CardHeader>
-            <CardTitle>To'lov tarixi</CardTitle>
-            <CardDescription>Barcha xizmatlar va to'lovlar tarixi</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {loadingPaymentHistory ? (
-              <div className="flex justify-center py-8">
-                <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+          <CardHeader 
+            className="cursor-pointer hover:bg-accent/50 transition-colors"
+            onClick={() => setShowPaymentHistory(!showPaymentHistory)}
+          >
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle>To'lov tarixi</CardTitle>
+                <CardDescription>Barcha xizmatlar va to'lovlar tarixi</CardDescription>
               </div>
-            ) : (
-              <PaymentHistoryTable
-                transactions={paymentHistory}
-              />
-            )}
-          </CardContent>
+              <Button variant="ghost" size="icon">
+                {showPaymentHistory ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="18 15 12 9 6 15"></polyline>
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="6 9 12 15 18 9"></polyline>
+                  </svg>
+                )}
+              </Button>
+            </div>
+          </CardHeader>
+          {showPaymentHistory && (
+            <CardContent>
+              {loadingPaymentHistory ? (
+                <div className="flex justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+                </div>
+              ) : (
+                <PaymentHistoryTable
+                  transactions={paymentHistory}
+                  currentPage={paymentHistoryPage}
+                  totalPages={paymentHistoryTotalPages}
+                  totalRecords={paymentHistoryTotal}
+                  onPageChange={(page) => {
+                    if (data?.vehicle?.customer?._id) {
+                      fetchPaymentHistory(data.vehicle.customer._id, page)
+                    }
+                  }}
+                />
+              )}
+            </CardContent>
+          )}
         </Card>
       )}
 
       <Card>
         <CardHeader className="flex flex-row items-center justify-between">
-          <CardTitle>Vehicle Information</CardTitle>
+          <CardTitle>Mashina ma'lumotlari</CardTitle>
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={handleViewHistory}>
               <History className="w-4 h-4 mr-2" />
               Ta'rix
             </Button>
             <Button variant="outline" size="sm" onClick={() => setShowEditVehicle(true)}>
-              Edit
+              Tahrirlash
             </Button>
             <Button variant="destructive" size="sm" onClick={() => handleDeleteVehicle()}>
-              Delete
+              O'chirish
             </Button>
           </div>
         </CardHeader>
         <CardContent>
           <dl className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Plate Number</dt>
+              <dt className="text-sm font-medium text-muted-foreground">Davlat raqami</dt>
               <dd className="text-lg font-bold text-primary mt-1">{vehicle.plateNumber}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Vehicle</dt>
+              <dt className="text-sm font-medium text-muted-foreground">Mashina</dt>
               <dd className="text-lg font-semibold text-foreground mt-1">{vehicle.brand} {vehicle.vehicleModel}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Customer</dt>
+              <dt className="text-sm font-medium text-muted-foreground">Mijoz</dt>
               <dd className="text-lg font-semibold text-foreground mt-1">{vehicle.customer?.name || 'N/A'}</dd>
             </div>
             <div>
-              <dt className="text-sm font-medium text-muted-foreground">Phone</dt>
+              <dt className="text-sm font-medium text-muted-foreground">Telefon</dt>
               <dd className="text-lg font-semibold text-foreground mt-1">{vehicle.customer?.phone || 'N/A'}</dd>
             </div>
           </dl>
@@ -937,17 +1114,17 @@ export default function VehicleDetailPage() {
       <Dialog open={showEditVehicle} onOpenChange={setShowEditVehicle}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Edit Vehicle</DialogTitle>
-            <DialogDescription>Update vehicle information</DialogDescription>
+            <DialogTitle>Mashinani tahrirlash</DialogTitle>
+            <DialogDescription>Mashina ma'lumotlarini yangilash</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div>
-              <Label>Plate Number</Label>
+              <Label>Davlat raqami</Label>
               <Input value={vehicle.plateNumber} disabled className="bg-muted" />
-              <p className="text-xs text-muted-foreground mt-1">Plate number cannot be changed</p>
+              <p className="text-xs text-muted-foreground mt-1">Davlat raqamini o'zgartirib bo'lmaydi</p>
             </div>
             <div>
-              <Label>Brand</Label>
+              <Label>Brend</Label>
               <Input 
                 id="edit-brand"
                 defaultValue={vehicle.brand}
@@ -961,7 +1138,7 @@ export default function VehicleDetailPage() {
               />
             </div>
             <div>
-              <Label>Engine Type</Label>
+              <Label>Dvigatel turi</Label>
               <Select 
                 defaultValue={vehicle.engineType}
                 onValueChange={(value) => setEditEngineType(value)}
@@ -970,19 +1147,19 @@ export default function VehicleDetailPage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="petrol">Petrol</SelectItem>
-                  <SelectItem value="diesel">Diesel</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                  <SelectItem value="electric">Electric</SelectItem>
+                  <SelectItem value="petrol">Benzin</SelectItem>
+                  <SelectItem value="diesel">Dizel</SelectItem>
+                  <SelectItem value="hybrid">Gibrid</SelectItem>
+                  <SelectItem value="electric">Elektr</SelectItem>
                 </SelectContent>
               </Select>
             </div>
             <div className="flex gap-2">
               <Button onClick={handleUpdateVehicle} className="flex-1">
-                Save Changes
+                O'zgarishlarni saqlash
               </Button>
               <Button variant="outline" onClick={() => setShowEditVehicle(false)}>
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </div>
@@ -1419,7 +1596,7 @@ export default function VehicleDetailPage() {
               {/* Pricing */}
               <div className="border-b pb-4">
                 <h3 className="font-semibold text-foreground mb-3">Pricing</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-3">
                   <div>
                     <Label htmlFor="edit-service-labor">Labor Cost (so'm)</Label>
                     <Input
@@ -1432,16 +1609,15 @@ export default function VehicleDetailPage() {
                       Used for employee commission calculation
                     </p>
                   </div>
-                  <div>
-                    <Label htmlFor="edit-service-price">Total Price (so'm) *</Label>
-                    <Input
-                      id="edit-service-price"
-                      type="number"
-                      defaultValue={editingService.price}
-                      placeholder="e.g., 250000"
-                    />
-                    <p className="text-xs text-muted-foreground mt-1">
-                      Final price charged to customer
+                  <div className="bg-muted/30 p-4 rounded-lg">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-muted-foreground">Total Price:</span>
+                      <span className="text-2xl font-bold text-primary">
+                        {(editingService.price || 0).toLocaleString()} so'm
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-2">
+                      Calculated automatically from products and labor cost
                     </p>
                   </div>
                 </div>
@@ -1599,30 +1775,30 @@ export default function VehicleDetailPage() {
       <Dialog open={showOilChangeDialog} onOpenChange={setShowOilChangeDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>New Oil Change Service</DialogTitle>
+            <DialogTitle>Yangi moy almashtirish xizmati</DialogTitle>
             <DialogDescription>
-              Vehicle: {vehicle.plateNumber} - {vehicle.brand} {vehicle.vehicleModel}
+              Mashina: {vehicle.plateNumber} - {vehicle.brand} {vehicle.vehicleModel}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* Vehicle Info */}
             <div className="p-4 bg-secondary/50 rounded-lg">
-              <h3 className="font-semibold text-foreground mb-3">Vehicle Information</h3>
+              <h3 className="font-semibold text-foreground mb-3">Mashina ma'lumotlari</h3>
               <div className="grid grid-cols-2 gap-3 text-sm">
                 <div>
-                  <p className="text-muted-foreground">Brand/Model</p>
+                  <p className="text-muted-foreground">Brend/Model</p>
                   <p className="font-medium text-foreground">{vehicle.brand} {vehicle.vehicleModel}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Engine</p>
-                  <p className="font-medium text-foreground capitalize">{vehicle.engineType}</p>
+                  <p className="text-muted-foreground">Dvigatel</p>
+                  <p className="font-medium text-foreground capitalize">{vehicle.engineType === 'petrol' ? 'Benzin' : vehicle.engineType === 'diesel' ? 'Dizel' : vehicle.engineType}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Customer</p>
+                  <p className="text-muted-foreground">Mijoz</p>
                   <p className="font-medium text-foreground">{vehicle.customer?.name || 'N/A'}</p>
                 </div>
                 <div>
-                  <p className="text-muted-foreground">Phone</p>
+                  <p className="text-muted-foreground">Telefon</p>
                   <p className="font-medium text-foreground">{vehicle.customer?.phone || 'N/A'}</p>
                 </div>
               </div>
@@ -1641,27 +1817,27 @@ export default function VehicleDetailPage() {
                   })}
                 />
                 <Label htmlFor="oilProductCustomerProvided" className="cursor-pointer">
-                  Customer provided their own oil
+                  Mijoz o'z moyini olib keldi
                 </Label>
               </div>
 
               {formData.oilProductCustomerProvided ? (
                 <div>
-                  <Label htmlFor="oilProductCustomerProvidedDetails">Oil Details *</Label>
+                  <Label htmlFor="oilProductCustomerProvidedDetails">Moy ma'lumotlari *</Label>
                   <Input
                     id="oilProductCustomerProvidedDetails"
-                    placeholder="e.g., Mobil 5W-30 SN 4L"
+                    placeholder="Masalan: Mobil 5W-30 SN 4L"
                     value={formData.oilProductCustomerProvidedDetails}
                     onChange={(e) => setFormData({ ...formData, oilProductCustomerProvidedDetails: e.target.value })}
                     required
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Enter oil brand, viscosity, and volume
+                    Moy brendi, qovushqoqligi va hajmini kiriting
                   </p>
                 </div>
               ) : (
                 <div>
-                  <h3 className="font-semibold text-foreground mb-4">Oil Product *</h3>
+                  <h3 className="font-semibold text-foreground mb-4">Moy mahsuloti *</h3>
                   <Select
                     value={formData.oilProductId}
                     onValueChange={(value) => {
@@ -1674,15 +1850,15 @@ export default function VehicleDetailPage() {
                     }}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder="Select oil product" />
+                      <SelectValue placeholder="Moy mahsulotini tanlang" />
                     </SelectTrigger>
                     <SelectContent>
                       {oilProducts.length === 0 ? (
-                        <div className="p-2 text-sm text-muted-foreground">No oil products available</div>
+                        <div className="p-2 text-sm text-muted-foreground">Moy mahsulotlari mavjud emas</div>
                       ) : (
                         oilProducts.map((product) => (
                           <SelectItem key={product._id} value={product._id}>
-                            {product.displayName} - {(product.price || 0).toLocaleString()} so'm ({product.stock || 0} in stock)
+                            {product.displayName} - {(product.price || 0).toLocaleString()} so'm ({product.stock || 0} omborda)
                           </SelectItem>
                         ))
                       )}
@@ -1693,7 +1869,7 @@ export default function VehicleDetailPage() {
 
               {(formData.oilProductId || formData.oilProductCustomerProvided) && (
                 <div>
-                  <Label htmlFor="oilQuantityUsed">Oil Quantity Used (Liters) *</Label>
+                  <Label htmlFor="oilQuantityUsed">Ishlatilgan moy miqdori (Litr) *</Label>
                   <Input
                     id="oilQuantityUsed"
                     type="number"
@@ -1712,8 +1888,8 @@ export default function VehicleDetailPage() {
                       const calculatedPrice = pricePerLiter * quantityUsed
                       return (
                         <p className="text-xs text-muted-foreground mt-1">
-                          Container: {selectedProduct.volume}L • Price/L: {pricePerLiter.toFixed(2)} so'm •
-                          Total oil cost: {calculatedPrice.toFixed(2)} so'm
+                          Idish: {selectedProduct.volume}L • Narx/L: {pricePerLiter.toFixed(2)} so'm •
+                          Jami moy narxi: {calculatedPrice.toFixed(2)} so'm
                         </p>
                       )
                     }
@@ -1725,7 +1901,7 @@ export default function VehicleDetailPage() {
 
             {/* Filters Selection */}
             <div className="border-b pb-6 space-y-6">
-              <h3 className="font-semibold text-foreground text-lg">Filters (Optional)</h3>
+              <h3 className="font-semibold text-foreground text-lg">Filterlar (Ixtiyoriy)</h3>
 
               {/* Oil Filter */}
               <div className="space-y-4">
@@ -1740,34 +1916,34 @@ export default function VehicleDetailPage() {
                     })}
                   />
                   <Label htmlFor="oilFilterCustomerProvided" className="cursor-pointer">
-                    Customer provided their own oil filter
+                    Mijoz o'z moy filterini olib keldi
                   </Label>
                 </div>
 
                 {formData.oilFilterCustomerProvided ? (
                   <div>
-                    <Label htmlFor="oilFilterCustomerProvidedDetails">Oil Filter Details</Label>
+                    <Label htmlFor="oilFilterCustomerProvidedDetails">Moy filteri ma'lumotlari</Label>
                     <Input
                       id="oilFilterCustomerProvidedDetails"
-                      placeholder="e.g., Mann W 712/75"
+                      placeholder="Masalan: Mann W 712/75"
                       value={formData.oilFilterCustomerProvidedDetails}
                       onChange={(e) => setFormData({ ...formData, oilFilterCustomerProvidedDetails: e.target.value })}
                     />
                   </div>
                 ) : (
                   <div>
-                    <Label>Oil Filter</Label>
+                    <Label>Moy filteri</Label>
                     <Select value={formData.oilFilterId} onValueChange={(value) => setFormData({ ...formData, oilFilterId: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select oil filter (optional)" />
+                        <SelectValue placeholder="Moy filterini tanlang (ixtiyoriy)" />
                       </SelectTrigger>
                       <SelectContent>
                         {oilFilters.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground">No oil filters available</div>
+                          <div className="p-2 text-sm text-muted-foreground">Moy filterlari mavjud emas</div>
                         ) : (
                           oilFilters.map((filter) => (
                             <SelectItem key={filter._id} value={filter._id}>
-                              {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {(filter.price || 0).toLocaleString()} so'm ({filter.stock || 0} in stock)
+                              {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {(filter.price || 0).toLocaleString()} so'm ({filter.stock || 0} omborda)
                             </SelectItem>
                           ))
                         )}
@@ -1790,34 +1966,34 @@ export default function VehicleDetailPage() {
                     })}
                   />
                   <Label htmlFor="airFilterCustomerProvided" className="cursor-pointer">
-                    Customer provided their own air filter
+                    Mijoz o'z havo filterini olib keldi
                   </Label>
                 </div>
 
                 {formData.airFilterCustomerProvided ? (
                   <div>
-                    <Label htmlFor="airFilterCustomerProvidedDetails">Air Filter Details</Label>
+                    <Label htmlFor="airFilterCustomerProvidedDetails">Havo filteri ma'lumotlari</Label>
                     <Input
                       id="airFilterCustomerProvidedDetails"
-                      placeholder="e.g., Mann C 27 011"
+                      placeholder="Masalan: Mann C 27 011"
                       value={formData.airFilterCustomerProvidedDetails}
                       onChange={(e) => setFormData({ ...formData, airFilterCustomerProvidedDetails: e.target.value })}
                     />
                   </div>
                 ) : (
                   <div>
-                    <Label>Air Filter</Label>
+                    <Label>Havo filteri</Label>
                     <Select value={formData.airFilterId} onValueChange={(value) => setFormData({ ...formData, airFilterId: value })}>
                       <SelectTrigger>
-                        <SelectValue placeholder="Select air filter (optional)" />
+                        <SelectValue placeholder="Havo filterini tanlang (ixtiyoriy)" />
                       </SelectTrigger>
                       <SelectContent>
                         {airFilters.length === 0 ? (
-                          <div className="p-2 text-sm text-muted-foreground">No air filters available</div>
+                          <div className="p-2 text-sm text-muted-foreground">Havo filterlari mavjud emas</div>
                         ) : (
                           airFilters.map((filter) => (
                             <SelectItem key={filter._id} value={filter._id}>
-                              {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {(filter.price || 0).toLocaleString()} so'm ({filter.stock || 0} in stock)
+                              {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {(filter.price || 0).toLocaleString()} so'm ({filter.stock || 0} omborda)
                             </SelectItem>
                           ))
                         )}
@@ -1836,7 +2012,7 @@ export default function VehicleDetailPage() {
                   className="w-full"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Add More Filters (Cabin & Fuel)
+                  Ko'proq filterlar qo'shish (Salon va Yoqilg'i)
                 </Button>
               )}
 
@@ -1856,34 +2032,34 @@ export default function VehicleDetailPage() {
                         })}
                       />
                       <Label htmlFor="cabinFilterCustomerProvided" className="cursor-pointer">
-                        Customer provided their own cabin filter
+                        Mijoz o'z salon filterini olib keldi
                       </Label>
                     </div>
 
                     {formData.cabinFilterCustomerProvided ? (
                       <div>
-                        <Label htmlFor="cabinFilterCustomerProvidedDetails">Cabin Filter Details</Label>
+                        <Label htmlFor="cabinFilterCustomerProvidedDetails">Salon filteri ma'lumotlari</Label>
                         <Input
                           id="cabinFilterCustomerProvidedDetails"
-                          placeholder="e.g., Mann CU 2882"
+                          placeholder="Masalan: Mann CU 2882"
                           value={formData.cabinFilterCustomerProvidedDetails}
                           onChange={(e) => setFormData({ ...formData, cabinFilterCustomerProvidedDetails: e.target.value })}
                         />
                       </div>
                     ) : (
                       <div>
-                        <Label>Cabin Filter</Label>
+                        <Label>Salon filteri</Label>
                         <Select value={formData.cabinFilterId} onValueChange={(value) => setFormData({ ...formData, cabinFilterId: value })}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select cabin filter (optional)" />
+                            <SelectValue placeholder="Salon filterini tanlang (ixtiyoriy)" />
                           </SelectTrigger>
                           <SelectContent>
                             {cabinFilters.length === 0 ? (
-                              <div className="p-2 text-sm text-muted-foreground">No cabin filters available</div>
+                              <div className="p-2 text-sm text-muted-foreground">Salon filterlari mavjud emas</div>
                             ) : (
                               cabinFilters.map((filter) => (
                                 <SelectItem key={filter._id} value={filter._id}>
-                                  {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {(filter.price || 0).toLocaleString()} so'm ({filter.stock || 0} in stock)
+                                  {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {(filter.price || 0).toLocaleString()} so'm ({filter.stock || 0} omborda)
                                 </SelectItem>
                               ))
                             )}
@@ -1906,34 +2082,34 @@ export default function VehicleDetailPage() {
                         })}
                       />
                       <Label htmlFor="fuelFilterCustomerProvided" className="cursor-pointer">
-                        Customer provided their own fuel filter
+                        Mijoz o'z yoqilg'i filterini olib keldi
                       </Label>
                     </div>
 
                     {formData.fuelFilterCustomerProvided ? (
                       <div>
-                        <Label htmlFor="fuelFilterCustomerProvidedDetails">Fuel Filter Details</Label>
+                        <Label htmlFor="fuelFilterCustomerProvidedDetails">Yoqilg'i filteri ma'lumotlari</Label>
                         <Input
                           id="fuelFilterCustomerProvidedDetails"
-                          placeholder="e.g., Mann WK 853/3"
+                          placeholder="Masalan: Mann WK 853/3"
                           value={formData.fuelFilterCustomerProvidedDetails}
                           onChange={(e) => setFormData({ ...formData, fuelFilterCustomerProvidedDetails: e.target.value })}
                         />
                       </div>
                     ) : (
                       <div>
-                        <Label>Fuel Filter</Label>
+                        <Label>Yoqilg'i filteri</Label>
                         <Select value={formData.fuelFilterId} onValueChange={(value) => setFormData({ ...formData, fuelFilterId: value })}>
                           <SelectTrigger>
-                            <SelectValue placeholder="Select fuel filter (optional)" />
+                            <SelectValue placeholder="Yoqilg'i filterini tanlang (ixtiyoriy)" />
                           </SelectTrigger>
                           <SelectContent>
                             {fuelFilters.length === 0 ? (
-                              <div className="p-2 text-sm text-muted-foreground">No fuel filters available</div>
+                              <div className="p-2 text-sm text-muted-foreground">Yoqilg'i filterlari mavjud emas</div>
                             ) : (
                               fuelFilters.map((filter) => (
                                 <SelectItem key={filter._id} value={filter._id}>
-                                  {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {filter.price.toLocaleString()} so'm ({filter.stock} in stock)
+                                  {filter.displayName || `${filter.brandName} ${filter.partNumber}`} - {filter.price.toLocaleString()} so'm ({filter.stock} omborda)
                                 </SelectItem>
                               ))
                             )}
@@ -1948,7 +2124,7 @@ export default function VehicleDetailPage() {
 
             {/* Additional Products */}
             <div className="border-b pb-6 space-y-4">
-              <h3 className="font-semibold text-foreground">Other Products (Optional)</h3>
+              <h3 className="font-semibold text-foreground">Boshqa mahsulotlar (Ixtiyoriy)</h3>
 
               {/* Show Additional Products Button */}
               {!showAdditionalProducts && (
@@ -1959,7 +2135,7 @@ export default function VehicleDetailPage() {
                   className="w-full"
                 >
                   <Plus className="w-4 h-4 mr-2" />
-                  Add Other Products
+                  Boshqa mahsulotlar qo'shish
                 </Button>
               )}
 
@@ -1969,9 +2145,9 @@ export default function VehicleDetailPage() {
                   {formData.customProducts.map((product, index) => (
                     <div key={index} className="grid grid-cols-12 gap-2 items-end">
                       <div className="col-span-7">
-                        <Label>Product Name</Label>
+                        <Label>Mahsulot nomi</Label>
                         <Input
-                          placeholder="e.g., Brake Fluid"
+                          placeholder="Masalan: Tormoz suyuqligi"
                           value={product.name}
                           onChange={(e) => {
                             const newProducts = [...formData.customProducts]
@@ -1981,7 +2157,7 @@ export default function VehicleDetailPage() {
                         />
                       </div>
                       <div className="col-span-4">
-                        <Label>Price (so'm)</Label>
+                        <Label>Narxi (so'm)</Label>
                         <Input
                           type="text"
                           placeholder="50 000"
@@ -2026,7 +2202,7 @@ export default function VehicleDetailPage() {
                     className="w-full"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Add Another Product
+                    Yana mahsulot qo'shish
                   </Button>
                 </div>
               )}
@@ -2035,7 +2211,7 @@ export default function VehicleDetailPage() {
             {/* Service Details */}
             <div className="space-y-4 border-b pb-6">
               <div>
-                <Label>Employees * (Select one or more)</Label>
+                <Label>Xodimlar * (Bir yoki bir nechtasini tanlang)</Label>
                 <div className="space-y-2 mt-2 max-h-40 overflow-y-auto border rounded-md p-3">
                   {employees.map((emp) => (
                     <div key={emp._id} className="flex items-center gap-2">
@@ -2064,14 +2240,14 @@ export default function VehicleDetailPage() {
                 </div>
                 {formData.employeeIds.length > 0 && (
                   <p className="text-xs text-muted-foreground mt-2">
-                    {formData.employeeIds.length} employee(s) selected
+                    {formData.employeeIds.length} xodim tanlandi
                   </p>
                 )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="laborCost">Labor Cost (UZS)</Label>
+                  <Label htmlFor="laborCost">Ish haqi (UZS)</Label>
                   <Input
                     type="text"
                     placeholder="50 000"
@@ -2084,11 +2260,11 @@ export default function VehicleDetailPage() {
                     }}
                   />
                   <p className="text-xs text-muted-foreground mt-1">
-                    Will be split based on commission rates
+                    Komissiya stavkalari asosida bo'linadi
                   </p>
                 </div>
                 <div>
-                  <Label htmlFor="mileage">Current Mileage (km) *</Label>
+                  <Label htmlFor="mileage">Hozirgi probeg (km) *</Label>
                   <Input
                     type="text"
                     placeholder="45 000"
@@ -2111,7 +2287,7 @@ export default function VehicleDetailPage() {
 
             <div className="grid grid-cols-1 gap-4 border-b pb-6">
               <div>
-                <Label htmlFor="nextServiceMileage">Next Service Mileage (km) *</Label>
+                <Label htmlFor="nextServiceMileage">Keyingi xizmat probegi (km) *</Label>
                 <Input
                   type="text"
                   placeholder="50 000"
@@ -2125,16 +2301,16 @@ export default function VehicleDetailPage() {
                   required
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Auto: +5000 km from current
+                  Avtomatik: hozirgi probegdan +5000 km
                 </p>
               </div>
             </div>
 
             {/* Notes */}
             <div>
-              <Label htmlFor="notes">Service Notes (Optional)</Label>
+              <Label htmlFor="notes">Xizmat haqida izohlar (Ixtiyoriy)</Label>
               <Textarea
-                placeholder="Any additional notes about the service..."
+                placeholder="Xizmat haqida qo'shimcha ma'lumotlar..."
                 value={formData.notes}
                 onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               />
@@ -2161,18 +2337,18 @@ export default function VehicleDetailPage() {
             <div className="bg-secondary/50 p-4 rounded-lg">
               <div className="space-y-2 text-sm mb-3">
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Products & Parts:</span>
+                  <span className="text-muted-foreground">Mahsulotlar va qismlar:</span>
                   <span className="font-medium">{(calculatePrice() - (Number(formData.laborCost) || 0)).toLocaleString()} so'm</span>
                 </div>
                 {formData.laborCost && Number(formData.laborCost) > 0 && (
                   <div className="flex justify-between">
-                    <span className="text-muted-foreground">Labor Cost:</span>
+                    <span className="text-muted-foreground">Ish haqi:</span>
                     <span className="font-medium">{Number(formData.laborCost).toLocaleString()} so'm</span>
                   </div>
                 )}
               </div>
               <div className="flex justify-between items-center pt-3 border-t">
-                <span className="text-foreground font-semibold">Total Price:</span>
+                <span className="text-foreground font-semibold">Jami narx:</span>
                 <span className="text-2xl font-bold text-primary">{calculatePrice().toLocaleString()} so'm</span>
               </div>
             </div>
@@ -2183,10 +2359,10 @@ export default function VehicleDetailPage() {
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saqlanmoqda...
                   </>
                 ) : (
-                  'Complete Service'
+                  'Xizmatni yakunlash'
                 )}
               </Button>
               <Button
@@ -2194,7 +2370,7 @@ export default function VehicleDetailPage() {
                 variant="outline"
                 onClick={() => setShowOilChangeDialog(false)}
               >
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </form>
@@ -2205,26 +2381,26 @@ export default function VehicleDetailPage() {
       <Dialog open={showPrintPreview} onOpenChange={setShowPrintPreview}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Service Completed!</DialogTitle>
-            <DialogDescription>Choose what you'd like to print</DialogDescription>
+            <DialogTitle>Xizmat yakunlandi!</DialogTitle>
+            <DialogDescription>Nima chop etishni tanlang</DialogDescription>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label className="text-base">Select Print Type</Label>
+              <Label className="text-base">Chop etish turini tanlang</Label>
               <div className="flex gap-4">
                 <Button
                   variant={printType === 'sticker' ? 'default' : 'outline'}
                   onClick={() => setPrintType('sticker')}
                   className="flex-1"
                 >
-                  Print Sticker (58x40mm)
+                  Stiker chop etish (58x40mm)
                 </Button>
                 <Button
                   variant={printType === 'receipt' ? 'default' : 'outline'}
                   onClick={() => setPrintType('receipt')}
                   className="flex-1"
                 >
-                  Print Receipt
+                  Kvitansiya chop etish
                 </Button>
               </div>
             </div>
@@ -2234,14 +2410,52 @@ export default function VehicleDetailPage() {
               {printType === 'sticker' ? (
                 <div className="text-center space-y-2">
                   <h3 className="font-bold text-base">58x40mm Sticker Preview</h3>
-                  <div className="border-2 border-dashed p-3 inline-block" style={{ width: '232px', height: '160px' }}>
-                    <div className="text-xs space-y-1 flex flex-col justify-center h-full">
-                      <p className="font-bold text-sm">{vehicle.plateNumber}</p>
-                      <p className="text-[10px]">{vehicle.brand} {vehicle.vehicleModel}</p>
-                      <p className="text-[10px]">{lastServiceData?.oilProductName || 'N/A'}</p>
-                      <p className="text-[10px]">{lastServiceData?.date ? new Date(lastServiceData.date).toLocaleDateString() : ''}</p>
-                      <p className="text-[10px] border-t pt-1 mt-1">Next: {lastServiceData?.nextServiceMileage || (lastServiceData?.mileage ? Number(lastServiceData.mileage) + 5000 : '')} km</p>
+                  <div className="border-2 border-dashed p-3 inline-block relative">
+                    <div className="text-xs space-y-1 text-left" style={{ paddingRight: '60px' }}>
+                      <div className="text-center pb-1 mb-2">
+                        <p className="font-bold text-sm">{tenant?.companyName || 'OILER.UZ'}</p>
+                        <p className="text-[9px]">{tenant?.businessPhone || ''}</p>
+                      </div>
+                      
+                      <p className="text-[10px]"><strong>Hozirgi:</strong> {(lastServiceData?.mileage || 0).toLocaleString()} km</p>
+                      {lastServiceData?.nextServiceMileage && (
+                        <p className="text-[10px]"><strong>Keyingi:</strong> {lastServiceData.nextServiceMileage.toLocaleString()} km</p>
+                      )}
+                      <p className="text-[10px]"><strong>Sana:</strong> {lastServiceData?.createdAt ? new Date(lastServiceData.createdAt).toLocaleDateString() : ''}</p>
+                      
+                      <div className="pt-1 space-y-0.5">
+                        {lastServiceData?.oilProduct && (
+                          <p className="text-[9px]">
+                            <strong>Moy:</strong> {
+                              typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
+                                ? `${lastServiceData.oilProduct.brand || 'N/A'} ${lastServiceData.oilProduct.viscosity} ${lastServiceData.oilProduct.apiGrade || ''} (${lastServiceData.oilQuantityUsed}L)`.trim()
+                                : (lastServiceData.oilProductCustomerProvidedDetails || 'N/A')
+                            }
+                          </p>
+                        )}
+                        {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided || lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && (
+                          <p className="text-[9px]">
+                            <strong>Filterlar:</strong>{' '}
+                            {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && 'Moy ✓'}{(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && (lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
+                            {(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && 'Havo ✓'}{(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && (lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
+                            {(lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided) && 'Salon ✓'}{(lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided) && (lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
+                            {(lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && 'Yoqilg\'i ✓'}
+                          </p>
+                        )}
+                        {lastServiceData?.employees && lastServiceData.employees.length > 0 && (
+                          <p className="text-[9px]">
+                            <strong>Xodim:</strong> {lastServiceData.employees.map((e: any) => typeof e === 'object' && e.name ? e.name : 'N/A').join(', ')}
+                          </p>
+                        )}
+                      </div>
                     </div>
+                    
+                    {/* QR Code - o'ng pastda */}
+                    {qrCodeDataUrl && (
+                      <div className="absolute bottom-2 right-2" style={{ width: '50px', height: '50px' }}>
+                        <img src={qrCodeDataUrl} alt="QR Code" className="w-full h-full" />
+                      </div>
+                    )}
                   </div>
                 </div>
               ) : (
@@ -2290,21 +2504,84 @@ export default function VehicleDetailPage() {
       {/* Hidden Print Area */}
       {lastServiceData && (
         <div className="print-sticker-area" style={{ display: 'none' }}>
-          <div style={{ fontSize: '14px', fontWeight: 'bold', marginBottom: '2mm' }}>
-            {vehicle.plateNumber}
-          </div>
-          <div style={{ fontSize: '9px', marginBottom: '1mm' }}>
-            {vehicle.brand} {vehicle.vehicleModel}
-          </div>
-          <div style={{ fontSize: '9px', marginBottom: '1mm' }}>
-            {lastServiceData.oilProductName || 'N/A'}
-          </div>
-          <div style={{ fontSize: '8px', marginBottom: '2mm' }}>
-            {new Date(lastServiceData.date).toLocaleDateString()}
-          </div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: '1mm', fontSize: '8px', fontWeight: 'bold' }}>
-            Next Service: {lastServiceData.nextServiceMileage || (Number(lastServiceData.mileage) + 5000)} km
-          </div>
+          {printType === 'sticker' ? (
+            <div className=" p-3 inline-block relative">
+              <div className="text-xs space-y-1 text-left" style={{ paddingRight: '60px' }}>
+                <div className="text-center ">
+                  <p className="font-bold text-sm text-[15px]" style={{ whiteSpace: 'nowrap' }}>{tenant?.companyName || 'OILER.UZ'}</p>
+                  <p className="text-[11px]">{tenant?.businessPhone || ''}</p>
+                </div>
+                
+                <p className="text-[11px] m-0"><strong>Hozirgi:</strong> {(lastServiceData?.mileage || 0).toLocaleString()} km</p>
+                {lastServiceData?.nextServiceMileage && (
+                  <p className="text-[11px] m-0"><strong>Keyingi:</strong> {lastServiceData.nextServiceMileage.toLocaleString()} km</p>
+                )}
+                <p className="text-[11px] m-0"><strong>Sana:</strong> {lastServiceData?.createdAt ? new Date(lastServiceData.createdAt).toLocaleDateString() : ''}</p>
+                
+                <div className=" space-y-0.5">
+                  {lastServiceData?.oilProduct && (
+                    <p className="text-[11px] m-0" style={{ whiteSpace: 'nowrap' }}>
+                      <strong>Moy:</strong> {
+                        typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
+                          ? `${lastServiceData.oilProduct.brand || 'N/A'} ${lastServiceData.oilProduct.viscosity} ${lastServiceData.oilProduct.apiGrade || ''} (${lastServiceData.oilQuantityUsed}L)`.trim()
+                          : (lastServiceData.oilProductCustomerProvidedDetails || 'N/A')
+                      }
+                    </p>
+                  )}
+                  {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided || lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && (
+                    <p className="text-[11px] m-0" style={{ whiteSpace: 'nowrap' }}>
+                      <strong>Filterlar:</strong>{' '}
+                      {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && 'Moy ✓'}{(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && (lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
+                      {(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && 'Havo ✓'}{(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && (lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
+                      {(lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided) && 'Salon ✓'}{(lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided) && (lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
+                      {(lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && 'Yoqilg\'i ✓'}
+                    </p>
+                  )}
+                  {lastServiceData?.employees && lastServiceData.employees.length > 0 && (
+                    <p className="text-[11px] mt-1">
+                      <strong>Xodim:</strong> {lastServiceData.employees.map((e: any) => typeof e === 'object' && e.name ? e.name : 'N/A').join(', ')}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              {/* QR Code - o'ng pastda */}
+              {qrCodeDataUrl && (
+                <div className="absolute bottom-2 top-6.5 right-1" style={{ width: '60px', height: '60px' }}>
+                  <img src={qrCodeDataUrl} alt="QR Code" className="w-full h-full" />
+                </div>
+              )}
+            </div>
+          ) : (
+            <div style={{ padding: '10mm', maxWidth: '80mm', fontSize: '12px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '5mm' }}>
+                <h1 style={{ fontSize: '18px', fontWeight: 'bold' }}>{companySettings?.companyName || 'OILER.UZ'}</h1>
+                <p>{companySettings?.companyPhone || ''}</p>
+              </div>
+              <div style={{ borderTop: '1px solid #000', borderBottom: '1px solid #000', padding: '3mm 0', marginBottom: '3mm' }}>
+                <div><strong>Mashina:</strong> {vehicle.plateNumber}</div>
+                <div><strong>Model:</strong> {vehicle.brand} {vehicle.vehicleModel}</div>
+                <div><strong>Mijoz:</strong> {vehicle.customer?.name}</div>
+                <div><strong>Probeg:</strong> {(lastServiceData.mileage || 0).toLocaleString()} km</div>
+                <div><strong>Sana:</strong> {new Date(lastServiceData.createdAt).toLocaleDateString()}</div>
+              </div>
+              <div style={{ marginBottom: '3mm' }}>
+                <div style={{ fontWeight: 'bold', marginBottom: '2mm' }}>Xizmatlar:</div>
+                {lastServiceData.oilProduct && (
+                  <div>• Moy: {lastServiceData.oilProduct.brand} {lastServiceData.oilProduct.viscosity}</div>
+                )}
+                {lastServiceData.oilFilter && (
+                  <div>• Moy filteri: {lastServiceData.oilFilter.brandName}</div>
+                )}
+              </div>
+              <div style={{ borderTop: '1px solid #000', paddingTop: '3mm', fontSize: '14px', fontWeight: 'bold' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span>JAMI:</span>
+                  <span>{(lastServiceData.price || 0).toLocaleString()} so'm</span>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
@@ -2367,279 +2644,7 @@ export default function VehicleDetailPage() {
         }}
       />
 
-      {/* A4 Print Area - Hidden on screen, visible on print */}
-      {showA4Print && printServiceData && (
-        <div className="print-a4-area fixed inset-0 bg-white z-50 overflow-auto">
-          <div className="max-w-4xl mx-auto p-8">
-          {/* Company Header */}
-          <div style={{ textAlign: 'center', marginBottom: '30px', borderBottom: '3px solid #000', paddingBottom: '20px' }}>
-            <h1 style={{ fontSize: '32px', fontWeight: 'bold', margin: '0', textTransform: 'uppercase', letterSpacing: '2px' }}>
-              {companySettings?.companyName || 'OILER.UZ'}
-            </h1>
-            <div style={{ marginTop: '10px', fontSize: '14px', color: '#333' }}>
-              {companySettings?.businessPhone && (
-                <p style={{ margin: '5px 0', fontWeight: '500' }}>
-                  📞 Tel: {companySettings.businessPhone}
-                </p>
-              )}
-              {companySettings?.businessEmail && (
-                <p style={{ margin: '5px 0' }}>
-                  ✉️ Email: {companySettings.businessEmail}
-                </p>
-              )}
-              {companySettings?.address && (
-                <p style={{ margin: '5px 0' }}>
-                  📍 Manzil: {companySettings.address}
-                </p>
-              )}
-            </div>
-          </div>
-
-          {/* Service Information */}
-          <div style={{ marginBottom: '30px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
-              XIZMAT MA'LUMOTLARI
-            </h2>
-            
-            <table style={{ width: '100%', borderCollapse: 'collapse', marginBottom: '20px' }}>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '8px', fontWeight: 'bold', width: '30%' }}>Sana:</td>
-                  <td style={{ padding: '8px' }}>{new Date(printServiceData.createdAt).toLocaleDateString('uz-UZ', { 
-                    year: 'numeric', 
-                    month: 'long', 
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}</td>
-                </tr>
-                <tr style={{ backgroundColor: '#f5f5f5' }}>
-                  <td style={{ padding: '8px', fontWeight: 'bold' }}>Avtomobil:</td>
-                  <td style={{ padding: '8px' }}>{vehicle.plateNumber} - {vehicle.brand} {vehicle.vehicleModel}</td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '8px', fontWeight: 'bold' }}>Mijoz:</td>
-                  <td style={{ padding: '8px' }}>{vehicle.customer?.name || 'N/A'}</td>
-                </tr>
-                <tr style={{ backgroundColor: '#f5f5f5' }}>
-                  <td style={{ padding: '8px', fontWeight: 'bold' }}>Telefon:</td>
-                  <td style={{ padding: '8px' }}>{vehicle.customer?.phone || 'N/A'}</td>
-                </tr>
-                {printServiceData.mileage && (
-                  <tr>
-                    <td style={{ padding: '8px', fontWeight: 'bold' }}>Probeg:</td>
-                    <td style={{ padding: '8px' }}>{printServiceData.mileage.toLocaleString()} km</td>
-                  </tr>
-                )}
-                {printServiceData.nextServiceMileage && (
-                  <tr style={{ backgroundColor: '#f5f5f5' }}>
-                    <td style={{ padding: '8px', fontWeight: 'bold' }}>Keyingi xizmat:</td>
-                    <td style={{ padding: '8px' }}>{printServiceData.nextServiceMileage.toLocaleString()} km</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Service Details Table */}
-          <div style={{ marginBottom: '30px' }}>
-            <h2 style={{ fontSize: '20px', fontWeight: 'bold', marginBottom: '15px', borderBottom: '2px solid #333', paddingBottom: '10px' }}>
-              {printServiceData.type === 'oilChange' ? 'MOY ALMASHTIRISH' : 'ISH SESSIYASI'}
-            </h2>
-
-            {printServiceData.type === 'oilChange' ? (
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ddd' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#333', color: 'white' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Mahsulot</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Tafsilot</th>
-                    <th style={{ padding: '12px', textAlign: 'right', border: '1px solid #ddd' }}>Narx</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {printServiceData.oilProduct && (
-                    <tr>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>Moy</td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                        {printServiceData.oilProduct.displayName || printServiceData.oilProduct.brand}
-                        {printServiceData.oilQuantityUsed && ` (${printServiceData.oilQuantityUsed}L)`}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                        {((printServiceData.oilProduct.price / printServiceData.oilProduct.volume) * printServiceData.oilQuantityUsed).toLocaleString()} so'm
-                      </td>
-                    </tr>
-                  )}
-                  {printServiceData.oilFilter && (
-                    <tr style={{ backgroundColor: '#f9f9f9' }}>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>Moy filteri</td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                        {printServiceData.oilFilter.displayName || printServiceData.oilFilter.name}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                        {printServiceData.oilFilter.price?.toLocaleString()} so'm
-                      </td>
-                    </tr>
-                  )}
-                  {printServiceData.airFilter && (
-                    <tr>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>Havo filteri</td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                        {printServiceData.airFilter.displayName || printServiceData.airFilter.name}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                        {printServiceData.airFilter.price?.toLocaleString()} so'm
-                      </td>
-                    </tr>
-                  )}
-                  {printServiceData.cabinFilter && (
-                    <tr style={{ backgroundColor: '#f9f9f9' }}>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>Salon filteri</td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                        {printServiceData.cabinFilter.displayName || printServiceData.cabinFilter.name}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                        {printServiceData.cabinFilter.price?.toLocaleString()} so'm
-                      </td>
-                    </tr>
-                  )}
-                  {printServiceData.fuelFilter && (
-                    <tr>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>Yoqilg'i filteri</td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                        {printServiceData.fuelFilter.displayName || printServiceData.fuelFilter.name}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                        {printServiceData.fuelFilter.price?.toLocaleString()} so'm
-                      </td>
-                    </tr>
-                  )}
-                  {printServiceData.laborCost > 0 && (
-                    <tr style={{ backgroundColor: '#f9f9f9' }}>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>Ish haqi</td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd' }}>
-                        {printServiceData.employees?.map((e: any) => e.name).join(', ')}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right' }}>
-                        {printServiceData.laborCost.toLocaleString()} so'm
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            ) : (
-              <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #ddd' }}>
-                <thead>
-                  <tr style={{ backgroundColor: '#333', color: 'white' }}>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Xizmat</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Mahsulotlar</th>
-                    <th style={{ padding: '12px', textAlign: 'left', border: '1px solid #ddd' }}>Xodimlar</th>
-                    <th style={{ padding: '12px', textAlign: 'right', border: '1px solid #ddd' }}>Narx</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {printServiceData.services?.map((service: any, idx: number) => (
-                    <tr key={idx} style={{ backgroundColor: idx % 2 === 0 ? 'white' : '#f9f9f9' }}>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', verticalAlign: 'top' }}>
-                        <strong>{service.serviceName}</strong>
-                        {service.laborCost > 0 && (
-                          <div style={{ fontSize: '12px', color: '#666', marginTop: '5px' }}>
-                            Ish haqi: {service.laborCost.toLocaleString()} so'm
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', verticalAlign: 'top' }}>
-                        {service.items && service.items.length > 0 ? (
-                          <div>
-                            {service.items.map((item: any, itemIdx: number) => (
-                              <div key={itemIdx} style={{ fontSize: '13px', marginBottom: '3px' }}>
-                                • {item.itemName} ({item.quantity} x {item.unitPrice.toLocaleString()} so'm)
-                              </div>
-                            ))}
-                          </div>
-                        ) : '-'}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', verticalAlign: 'top' }}>
-                        {service.employees && service.employees.length > 0 
-                          ? service.employees.map((emp: any) => emp.name).join(', ')
-                          : '-'}
-                      </td>
-                      <td style={{ padding: '10px', border: '1px solid #ddd', textAlign: 'right', verticalAlign: 'top' }}>
-                        <strong>{service.totalPrice.toLocaleString()} so'm</strong>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Total and Payment */}
-          <div style={{ marginTop: '30px', borderTop: '3px solid #000', paddingTop: '20px' }}>
-            <table style={{ width: '100%', fontSize: '16px' }}>
-              <tbody>
-                <tr>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', fontSize: '18px' }}>JAMI:</td>
-                  <td style={{ padding: '10px', textAlign: 'right', fontWeight: 'bold', fontSize: '24px', width: '200px' }}>
-                    {printServiceData.price?.toLocaleString()} so'm
-                  </td>
-                </tr>
-                <tr>
-                  <td style={{ padding: '10px', textAlign: 'right' }}>To'lov holati:</td>
-                  <td style={{ padding: '10px', textAlign: 'right', width: '200px' }}>
-                    {printServiceData.paymentStatus === 'paid' ? 'To\'langan' : 
-                     printServiceData.paymentStatus === 'partial' ? 'Qisman to\'langan' : 
-                     'To\'lanmagan'}
-                  </td>
-                </tr>
-                {printServiceData.amountPaid > 0 && (
-                  <tr>
-                    <td style={{ padding: '10px', textAlign: 'right' }}>To'langan:</td>
-                    <td style={{ padding: '10px', textAlign: 'right', width: '200px' }}>
-                      {printServiceData.amountPaid.toLocaleString()} so'm
-                    </td>
-                  </tr>
-                )}
-                {printServiceData.amountDue > 0 && (
-                  <tr>
-                    <td style={{ padding: '10px', textAlign: 'right', color: '#dc2626' }}>Qarz:</td>
-                    <td style={{ padding: '10px', textAlign: 'right', width: '200px', color: '#dc2626', fontWeight: 'bold' }}>
-                      {printServiceData.amountDue.toLocaleString()} so'm
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-          {/* Notes */}
-          {printServiceData.notes && (
-            <div style={{ marginTop: '30px', padding: '15px', backgroundColor: '#f5f5f5', borderLeft: '4px solid #333' }}>
-              <strong>Izoh:</strong> {printServiceData.notes}
-            </div>
-          )}
-
-          {/* Footer */}
-          <div style={{ marginTop: '50px', textAlign: 'center', fontSize: '12px', color: '#666', borderTop: '1px solid #ddd', paddingTop: '20px' }}>
-            <p>Xizmatimizdan foydalanganingiz uchun rahmat!</p>
-            <p>{companySettings?.companyName || 'OILER.UZ'} - Professional avtomobil xizmati</p>
-          </div>
-          
-          {/* Close button - only visible on screen, not on print */}
-          <div className="no-print mt-8 text-center">
-            <Button 
-              onClick={() => {
-                setShowA4Print(false)
-                setPrintServiceData(null)
-              }}
-              variant="outline"
-              size="lg"
-            >
-              Yopish
-            </Button>
-          </div>
-          </div>
-        </div>
-      )}
+      {/* A4 Print Modal REMOVED - Using print preview dialog instead */}
 
       {/* Unified Service History */}
       <UnifiedServiceHistory
@@ -2662,7 +2667,322 @@ export default function VehicleDetailPage() {
             handleViewGeneralServiceHistory(id)
           }
         }}
+        onComplete={handleCompleteService}
+        onRefresh={fetchVehicleData}
       />
+
+      {/* Complete Service Dialog */}
+      <Dialog open={showCompleteDialog} onOpenChange={setShowCompleteDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Xizmatni tugatish</DialogTitle>
+            <DialogDescription>
+              Xizmat ma'lumotlarini ko'rib chiqing va tasdiqlang
+            </DialogDescription>
+          </DialogHeader>
+          {completingServiceData && (
+            <div className="space-y-4">
+              {/* Vehicle Info */}
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <h3 className="font-semibold mb-2">Mashina ma'lumotlari</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Raqam: </span>
+                    <span className="font-medium">{data?.vehicle?.plateNumber}</span>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">Model: </span>
+                    <span className="font-medium">{data?.vehicle?.brand} {data?.vehicle?.vehicleModel}</span>
+                  </div>
+                  {completingServiceData.mileage && (
+                    <div>
+                      <span className="text-muted-foreground">Probeg: </span>
+                      <span className="font-medium">{completingServiceData.mileage.toLocaleString()} km</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Services Table */}
+              <div className="border rounded-lg overflow-hidden">
+                <table className="w-full text-sm">
+                  <thead className="bg-muted">
+                    <tr>
+                      <th className="text-left p-3 font-semibold">Xizmat</th>
+                      <th className="text-left p-3 font-semibold">Mahsulotlar</th>
+                      <th className="text-left p-3 font-semibold">Xodimlar</th>
+                      <th className="text-right p-3 font-semibold">Narx</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {completingServiceData.services?.map((service: any, idx: number) => (
+                      <tr key={idx} className="border-t">
+                        <td className="p-3 align-top">
+                          <div className="font-medium">{service.serviceName}</div>
+                          {service.laborCost > 0 && (
+                            <div className="text-xs text-muted-foreground mt-1">
+                              Ish haqi: {service.laborCost.toLocaleString()} so'm
+                            </div>
+                          )}
+                        </td>
+                        <td className="p-3 align-top">
+                          {service.items && service.items.length > 0 ? (
+                            <div className="space-y-1">
+                              {service.items.map((item: any, itemIdx: number) => (
+                                <div key={itemIdx} className="text-xs">
+                                  • {item.itemName} ({item.quantity} x {item.unitPrice.toLocaleString()})
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 align-top">
+                          {service.employees && service.employees.length > 0 ? (
+                            <div className="text-xs">
+                              {service.employees.map((emp: any) => emp.name).join(', ')}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">-</span>
+                          )}
+                        </td>
+                        <td className="p-3 align-top text-right font-medium">
+                          {service.totalPrice.toLocaleString()} so'm
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="bg-muted/50 border-t-2">
+                    <tr>
+                      <td colSpan={3} className="p-3 text-right font-semibold">
+                        Jami:
+                      </td>
+                      <td className="p-3 text-right font-bold text-lg">
+                        {completingServiceData.totalPrice.toLocaleString()} so'm
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+
+              {/* Payment Info */}
+              <div className="border rounded-lg p-4 bg-muted/30">
+                <h3 className="font-semibold mb-2">To'lov ma'lumotlari</h3>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="text-muted-foreground">Holat: </span>
+                    {completingServiceData.paymentStatus === 'paid' && (
+                      <Badge variant="default" className="bg-green-600">To'langan</Badge>
+                    )}
+                    {completingServiceData.paymentStatus === 'partial' && (
+                      <Badge variant="secondary">Qisman</Badge>
+                    )}
+                    {completingServiceData.paymentStatus === 'unpaid' && (
+                      <Badge variant="destructive">To'lanmagan</Badge>
+                    )}
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">To'langan: </span>
+                    <span className="font-medium">{completingServiceData.amountPaid.toLocaleString()} so'm</span>
+                  </div>
+                  {completingServiceData.amountDue > 0 && (
+                    <div>
+                      <span className="text-muted-foreground">Qarz: </span>
+                      <span className="font-medium text-destructive">{completingServiceData.amountDue.toLocaleString()} so'm</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Notes */}
+              {completingServiceData.notes && (
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <h3 className="font-semibold mb-2">Izohlar</h3>
+                  <p className="text-sm text-muted-foreground">{completingServiceData.notes}</p>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex gap-2 pt-4">
+                <Button 
+                  onClick={confirmCompleteService} 
+                  className="flex-1 bg-green-600 hover:bg-green-700"
+                >
+                  Tasdiqlash va tugatish
+                </Button>
+                <Button 
+                  variant="outline" 
+                  onClick={() => {
+                    setShowCompleteDialog(false)
+                    setCompletingServiceId('')
+                    setCompletingServiceData(null)
+                  }}
+                  className="flex-1"
+                >
+                  Bekor qilish
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+    
+
+      {/* Print Content */}
+      {lastServiceData && (
+        <div className="hidden print:block">
+          {printType === 'receipt' ? (
+            <div className="p-8">
+              <div className="text-center mb-6">
+                <h1 className="text-2xl font-bold">{companySettings?.companyName || 'OILER.UZ'}</h1>
+                <p className="text-sm">{companySettings?.companyPhone || ''}</p>
+                <p className="text-sm">{companySettings?.companyEmail || ''}</p>
+                <p className="text-sm">{companySettings?.companyAddress || ''}</p>
+              </div>
+              
+              <div className="border-t border-b py-4 mb-4">
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <span className="font-semibold">Mashina:</span> {data?.vehicle?.plateNumber}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Model:</span> {data?.vehicle?.brand} {data?.vehicle?.vehicleModel}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Mijoz:</span> {data?.vehicle?.customer?.name}
+                  </div>
+                  <div>
+                    <span className="font-semibold">Telefon:</span> {data?.vehicle?.customer?.phone}
+                  </div>
+                  {lastServiceData.mileage && (
+                    <div>
+                      <span className="font-semibold">Probeg:</span> {lastServiceData.mileage.toLocaleString()} km
+                    </div>
+                  )}
+                  <div>
+                    <span className="font-semibold">Sana:</span> {new Date(lastServiceData.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+              </div>
+
+              <div className="mb-4">
+                <h3 className="font-semibold mb-2">Xizmatlar:</h3>
+                {lastServiceData.services ? (
+                  lastServiceData.services.map((service: any, idx: number) => (
+                    <div key={idx} className="mb-3 text-sm">
+                      <div className="font-medium">{service.serviceName}</div>
+                      {service.items && service.items.map((item: any, itemIdx: number) => (
+                        <div key={itemIdx} className="ml-4">
+                          • {item.itemName} - {item.quantity} x {item.unitPrice.toLocaleString()} so'm
+                        </div>
+                      ))}
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-sm">
+                    <div className="font-medium">Moy almashtirish</div>
+                    {lastServiceData.oilProduct && (
+                      <div className="ml-4">• Moy: {lastServiceData.oilProduct.brand} {lastServiceData.oilProduct.viscosity}</div>
+                    )}
+                    {lastServiceData.oilFilter && (
+                      <div className="ml-4">• Moy filteri: {lastServiceData.oilFilter.brand} {lastServiceData.oilFilter.partNumber}</div>
+                    )}
+                    {lastServiceData.airFilter && (
+                      <div className="ml-4">• Havo filteri: {lastServiceData.airFilter.brand} {lastServiceData.airFilter.partNumber}</div>
+                    )}
+                    {lastServiceData.cabinFilter && (
+                      <div className="ml-4">• Salon filteri: {lastServiceData.cabinFilter.brand} {lastServiceData.cabinFilter.partNumber}</div>
+                    )}
+                    {lastServiceData.fuelFilter && (
+                      <div className="ml-4">• Yoqilg'i filteri: {lastServiceData.fuelFilter.brand} {lastServiceData.fuelFilter.partNumber}</div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              <div className="border-t pt-4">
+                <div className="flex justify-between text-lg font-bold mb-2">
+                  <span>JAMI:</span>
+                  <span>{(lastServiceData.totalPrice || lastServiceData.price || 0).toLocaleString()} so'm</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span>To'lov holati:</span>
+                  <span>{lastServiceData.paymentStatus === 'paid' ? 'To\'langan' : lastServiceData.paymentStatus === 'partial' ? 'Qisman' : 'To\'lanmagan'}</span>
+                </div>
+                {lastServiceData.amountDue > 0 && (
+                  <div className="flex justify-between text-sm text-red-600">
+                    <span>Qarz:</span>
+                    <span>{lastServiceData.amountDue.toLocaleString()} so'm</span>
+                  </div>
+                )}
+              </div>
+
+              <div className="text-center mt-6 text-xs">
+                <p>Xizmatimizdan foydalanganingiz uchun rahmat!</p>
+              </div>
+            </div>
+          ) : (
+            <div className="p-4 text-sm" style={{ width: '58mm', height: '40mm' }}>
+              <div className="text-center mb-2">
+                <h2 className="text-lg font-bold">{tenant?.companyName || 'OILER.UZ'}</h2>
+                <p className="text-xs">{tenant?.businessPhone || ''}</p>
+              </div>
+              
+              <div className="border-t border-b py-2 mb-2 text-xs">
+                <div><span className="font-semibold">Mashina:</span> {data?.vehicle?.plateNumber}</div>
+                <div><span className="font-semibold">Model:</span> {data?.vehicle?.brand} {data?.vehicle?.vehicleModel}</div>
+                <div><span className="font-semibold">Hozirgi km:</span> {(lastServiceData.mileage || 0).toLocaleString()} km</div>
+                {lastServiceData.nextServiceMileage && (
+                  <div><span className="font-semibold">Keyingi xizmat:</span> {lastServiceData.nextServiceMileage.toLocaleString()} km</div>
+                )}
+                <div><span className="font-semibold">Sana:</span> {new Date(lastServiceData.createdAt || lastServiceData.date).toLocaleDateString()}</div>
+              </div>
+
+              <div className="text-xs space-y-1">
+                <div className="font-semibold border-b pb-1">Xizmat ma'lumotlari:</div>
+                {lastServiceData.oilProduct && (
+                  <div>
+                    <span className="font-semibold">Moy:</span> {lastServiceData.oilProduct.brand} {lastServiceData.oilProduct.viscosity} {lastServiceData.oilProduct.apiGrade}
+                    {lastServiceData.oilQuantityUsed && ` (${lastServiceData.oilQuantityUsed}L)`}
+                  </div>
+                )}
+                {lastServiceData.oilFilter && (
+                  <div>
+                    <span className="font-semibold">Moy filteri:</span> {lastServiceData.oilFilter.brandName || lastServiceData.oilFilter.brand} {lastServiceData.oilFilter.partNumber}
+                  </div>
+                )}
+                {lastServiceData.airFilter && (
+                  <div>
+                    <span className="font-semibold">Havo filteri:</span> {lastServiceData.airFilter.brandName || lastServiceData.airFilter.brand} {lastServiceData.airFilter.partNumber}
+                  </div>
+                )}
+                {lastServiceData.cabinFilter && (
+                  <div>
+                    <span className="font-semibold">Salon filteri:</span> {lastServiceData.cabinFilter.brandName || lastServiceData.cabinFilter.brand} {lastServiceData.cabinFilter.partNumber}
+                  </div>
+                )}
+                {lastServiceData.fuelFilter && (
+                  <div>
+                    <span className="font-semibold">Yoqilg'i filteri:</span> {lastServiceData.fuelFilter.brandName || lastServiceData.fuelFilter.brand} {lastServiceData.fuelFilter.partNumber}
+                  </div>
+                )}
+                {lastServiceData.employees && lastServiceData.employees.length > 0 && (
+                  <div>
+                    <span className="font-semibold">Xodimlar:</span> {lastServiceData.employees.map((e: any) => e.name).join(', ')}
+                  </div>
+                )}
+                {lastServiceData.price && (
+                  <div className="mt-2 pt-2 border-t">
+                    <span className="font-semibold">Jami:</span> {lastServiceData.price.toLocaleString()} so'm
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   )
 }

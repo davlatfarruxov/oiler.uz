@@ -151,7 +151,7 @@ export function PaymentRecordingDialog({
           <div className="bg-muted/50 p-4 rounded-lg">
             <div className="flex justify-between items-center">
               <span className="text-sm text-muted-foreground">Jami qarz:</span>
-              <span className="text-lg font-bold text-destructive">
+              <span className="text-lg font-bold text-red-600 dark:text-red-500">
                 {totalDebt.toLocaleString()} so'm
               </span>
             </div>
@@ -192,7 +192,7 @@ export function PaymentRecordingDialog({
 
           {/* Selected Service Info */}
           {selectedService && (
-            <div className="bg-blue-50 border border-blue-200 p-3 rounded-lg">
+            <div className="bg-blue-100 dark:bg-blue-900/30 border border-blue-400 dark:border-blue-600 p-3 rounded-lg">
               <div className="flex justify-between items-center mb-1">
                 <span className="text-sm font-medium">Tanlangan xizmat:</span>
                 <span className="text-sm text-muted-foreground">
@@ -201,7 +201,7 @@ export function PaymentRecordingDialog({
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-muted-foreground">Qarz summasi:</span>
-                <span className="text-lg font-bold text-destructive">
+                <span className="text-lg font-bold text-red-600 dark:text-red-500">
                   {(selectedService.amountDue || 0).toLocaleString()} so'm
                 </span>
               </div>
@@ -260,7 +260,7 @@ export function PaymentRecordingDialog({
 
           {/* Error Message */}
           {error && (
-            <div className="bg-destructive/10 border border-destructive/20 text-destructive p-3 rounded-lg text-sm">
+            <div className="bg-red-100 dark:bg-red-900/30 border border-red-400 dark:border-red-600 text-red-700 dark:text-red-400 p-3 rounded-lg text-sm">
               {error}
             </div>
           )}

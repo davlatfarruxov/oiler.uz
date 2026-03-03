@@ -68,11 +68,11 @@ export default function SettingsPage() {
         address
       })
       
-      setSaveMessage({ type: 'success', text: 'Company information updated successfully!' })
+      setSaveMessage({ type: 'success', text: 'Kompaniya ma\'lumotlari muvaffaqiyatli yangilandi!' })
     } catch (error: any) {
       setSaveMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Failed to update company information' 
+        text: error.response?.data?.message || 'Kompaniya ma\'lumotlarini yangilashda xatolik' 
       })
     } finally {
       setIsSaving(false)
@@ -89,7 +89,7 @@ export default function SettingsPage() {
       if (isNaN(rateValue) || rateValue <= 0) {
         setSaveMessage({ 
           type: 'error', 
-          text: 'Please enter a valid exchange rate (positive number)' 
+          text: 'Iltimos, to\'g\'ri kurs qiymatini kiriting (musbat son)' 
         })
         return
       }
@@ -97,7 +97,7 @@ export default function SettingsPage() {
       const api = (await import('@/lib/api/axios')).default
       const response = await api.put('/settings/exchange-rate', { exchangeRate: rateValue })
       
-      setSaveMessage({ type: 'success', text: 'Exchange rate updated successfully!' })
+      setSaveMessage({ type: 'success', text: 'Valyuta kursi muvaffaqiyatli yangilandi!' })
       
       // Auto-hide success message after 3 seconds
       setTimeout(() => setSaveMessage(null), 3000)
@@ -105,7 +105,7 @@ export default function SettingsPage() {
       console.error('Exchange rate update error:', error)
       setSaveMessage({ 
         type: 'error', 
-        text: error.response?.data?.message || 'Failed to update exchange rate' 
+        text: error.response?.data?.message || 'Valyuta kursini yangilashda xatolik' 
       })
     } finally {
       setIsSaving(false)
@@ -125,8 +125,8 @@ export default function SettingsPage() {
     <div className="space-y-6">
       {/* Header */}
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Settings</h1>
-        <p className="text-muted-foreground mt-1">Manage application and business settings</p>
+        <h1 className="text-3xl font-bold text-foreground">Sozlamalar</h1>
+        <p className="text-muted-foreground mt-1">Ilova va biznes sozlamalarini boshqarish</p>
       </div>
 
       {/* Settings Tabs */}
@@ -134,19 +134,19 @@ export default function SettingsPage() {
         <TabsList>
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="w-4 h-4" />
-            Company
+            Kompaniya
           </TabsTrigger>
           <TabsTrigger value="subscription" className="gap-2">
             <CreditCard className="w-4 h-4" />
-            Subscription
+            Obuna
           </TabsTrigger>
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="w-4 h-4" />
-            Notifications
+            Bildirishnomalar
           </TabsTrigger>
           <TabsTrigger value="security" className="gap-2">
             <Lock className="w-4 h-4" />
-            Security
+            Xavfsizlik
           </TabsTrigger>
         </TabsList>
 
@@ -160,8 +160,8 @@ export default function SettingsPage() {
           
           <Card>
             <CardHeader>
-              <CardTitle>Business Information</CardTitle>
-              <CardDescription>Update your business details and contact information</CardDescription>
+              <CardTitle>Biznes ma'lumotlari</CardTitle>
+              <CardDescription>Biznes tafsilotlari va aloqa ma'lumotlarini yangilash</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               {tenantLoading ? (
@@ -171,16 +171,16 @@ export default function SettingsPage() {
               ) : (
                 <>
                   <div>
-                    <Label htmlFor="company">Company Name</Label>
+                    <Label htmlFor="company">Kompaniya nomi</Label>
                     <Input
                       id="company"
                       value={companyName}
                       onChange={(e) => setCompanyName(e.target.value)}
-                      placeholder="Your Company Name"
+                      placeholder="Kompaniya nomi"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="businessEmail">Business Email</Label>
+                    <Label htmlFor="businessEmail">Biznes email</Label>
                     <Input
                       id="businessEmail"
                       type="email"
@@ -190,7 +190,7 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="businessPhone">Business Phone</Label>
+                    <Label htmlFor="businessPhone">Biznes telefon</Label>
                     <Input
                       id="businessPhone"
                       value={businessPhone}
@@ -199,22 +199,22 @@ export default function SettingsPage() {
                     />
                   </div>
                   <div>
-                    <Label htmlFor="address">Address</Label>
+                    <Label htmlFor="address">Manzil</Label>
                     <Input
                       id="address"
                       value={address}
                       onChange={(e) => setAddress(e.target.value)}
-                      placeholder="123 Main St, Tashkent"
+                      placeholder="Toshkent shahar"
                     />
                   </div>
                   <Button onClick={handleSaveCompanyInfo} disabled={isSaving}>
                     {isSaving ? (
                       <>
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        Saving...
+                        Saqlanmoqda...
                       </>
                     ) : (
-                      'Save Changes'
+                      'O\'zgarishlarni saqlash'
                     )}
                   </Button>
                 </>
@@ -224,12 +224,12 @@ export default function SettingsPage() {
 
           <Card>
             <CardHeader>
-              <CardTitle>Service Settings</CardTitle>
-              <CardDescription>Configure service defaults</CardDescription>
+              <CardTitle>Xizmat sozlamalari</CardTitle>
+              <CardDescription>Xizmat standart sozlamalarini sozlash</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="defaultOil">Default Oil Type</Label>
+                <Label htmlFor="defaultOil">Standart moy turi</Label>
                 <Select defaultValue="5w30">
                   <SelectTrigger>
                     <SelectValue />
@@ -237,27 +237,27 @@ export default function SettingsPage() {
                   <SelectContent>
                     <SelectItem value="5w30">5W-30</SelectItem>
                     <SelectItem value="10w40">10W-40</SelectItem>
-                    <SelectItem value="synthetic">Synthetic 5W-30</SelectItem>
-                    <SelectItem value="highmileage">High Mileage 10W-40</SelectItem>
+                    <SelectItem value="synthetic">Sintetik 5W-30</SelectItem>
+                    <SelectItem value="highmileage">Yuqori probeg 10W-40</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <Label htmlFor="serviceInterval">Service Interval (km)</Label>
+                <Label htmlFor="serviceInterval">Xizmat intervali (km)</Label>
                 <Input id="serviceInterval" type="number" defaultValue="5000" />
               </div>
               <div>
-                <Label htmlFor="serviceIntervalMonths">Service Interval (Months)</Label>
+                <Label htmlFor="serviceIntervalMonths">Xizmat intervali (oy)</Label>
                 <Input id="serviceIntervalMonths" type="number" defaultValue="6" />
               </div>
-              <Button>Save Service Defaults</Button>
+              <Button>Standart sozlamalarni saqlash</Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Exchange Rate</CardTitle>
-              <CardDescription>Set USD to UZS exchange rate for cost calculations</CardDescription>
+              <CardTitle>Valyuta kursi</CardTitle>
+              <CardDescription>Xarajatlarni hisoblash uchun USD dan UZS ga kursni belgilash</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
@@ -270,14 +270,14 @@ export default function SettingsPage() {
                   onChange={(e) => setExchangeRate(e.target.value)}
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  This rate is used when adding products with USD cost price
+                  Bu kurs USD tannarxli mahsulotlar qo'shilganda ishlatiladi
                 </p>
               </div>
               <Button 
                 onClick={handleUpdateExchangeRate} 
                 disabled={isSaving}
               >
-                {isSaving ? 'Updating...' : 'Update Exchange Rate'}
+                {isSaving ? 'Yangilanmoqda...' : 'Valyuta kursini yangilash'}
               </Button>
             </CardContent>
           </Card>
@@ -287,17 +287,17 @@ export default function SettingsPage() {
         <TabsContent value="subscription" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Current Plan</CardTitle>
-              <CardDescription>View your subscription details and limits</CardDescription>
+              <CardTitle>Joriy tarif</CardTitle>
+              <CardDescription>Obuna tafsilotlari va cheklovlarni ko'rish</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground">Plan Type</p>
+                  <p className="text-sm font-medium text-muted-foreground">Tarif turi</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <p className="text-2xl font-bold capitalize">{tenant?.plan || 'Free'}</p>
+                    <p className="text-2xl font-bold capitalize">{tenant?.plan || 'Bepul'}</p>
                     <Badge variant={getPlanBadgeColor(tenant?.plan || 'free')}>
-                      {tenant?.isActive ? 'Active' : 'Inactive'}
+                      {tenant?.isActive ? 'Faol' : 'Nofaol'}
                     </Badge>
                   </div>
                 </div>
@@ -305,24 +305,24 @@ export default function SettingsPage() {
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t">
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Max Employees</p>
+                  <p className="text-sm font-medium text-muted-foreground">Maksimal xodimlar</p>
                   <p className="text-xl font-semibold">
-                    {tenant?.maxEmployees === -1 ? 'Unlimited' : tenant?.maxEmployees || 5}
+                    {tenant?.maxEmployees === -1 ? 'Cheksiz' : tenant?.maxEmployees || 5}
                   </p>
                 </div>
                 <div className="space-y-1">
-                  <p className="text-sm font-medium text-muted-foreground">Max Vehicles</p>
+                  <p className="text-sm font-medium text-muted-foreground">Maksimal mashinalar</p>
                   <p className="text-xl font-semibold">
-                    {tenant?.maxVehicles === -1 ? 'Unlimited' : tenant?.maxVehicles || 100}
+                    {tenant?.maxVehicles === -1 ? 'Cheksiz' : tenant?.maxVehicles || 100}
                   </p>
                 </div>
               </div>
 
               {tenant?.expiresAt && (
                 <div className="pt-4 border-t">
-                  <p className="text-sm font-medium text-muted-foreground">Expires At</p>
+                  <p className="text-sm font-medium text-muted-foreground">Amal qilish muddati</p>
                   <p className="text-lg font-semibold mt-1">
-                    {new Date(tenant.expiresAt).toLocaleDateString('en-US', {
+                    {new Date(tenant.expiresAt).toLocaleDateString('uz-UZ', {
                       year: 'numeric',
                       month: 'long',
                       day: 'numeric'
@@ -333,10 +333,10 @@ export default function SettingsPage() {
 
               <div className="pt-4 border-t">
                 <p className="text-sm text-muted-foreground mb-4">
-                  Want to upgrade your plan? Contact support for more information.
+                  Tarifni yangilashni xohlaysizmi? Qo'shimcha ma'lumot uchun qo'llab-quvvatlash xizmatiga murojaat qiling.
                 </p>
                 <Button variant="outline" disabled>
-                  Upgrade Plan (Coming Soon)
+                  Tarifni yangilash (Tez orada)
                 </Button>
               </div>
             </CardContent>
@@ -347,43 +347,43 @@ export default function SettingsPage() {
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Notification Preferences</CardTitle>
-              <CardDescription>Control how you receive alerts and updates</CardDescription>
+              <CardTitle>Bildirishnoma sozlamalari</CardTitle>
+              <CardDescription>Ogohlantirishlar va yangilanishlarni qabul qilishni boshqarish</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-foreground">Email Notifications</p>
-                  <p className="text-sm text-muted-foreground">Receive email alerts for important events</p>
+                  <p className="font-semibold text-foreground">Email bildirishnomalar</p>
+                  <p className="text-sm text-muted-foreground">Muhim voqealar uchun email ogohlantirishlari</p>
                 </div>
                 <Switch checked={emailNotifications} onCheckedChange={setEmailNotifications} />
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-foreground">SMS Notifications</p>
-                  <p className="text-sm text-muted-foreground">Receive SMS alerts for urgent matters</p>
+                  <p className="font-semibold text-foreground">SMS bildirishnomalar</p>
+                  <p className="text-sm text-muted-foreground">Shoshilinch holatlar uchun SMS ogohlantirishlari</p>
                 </div>
                 <Switch checked={smsNotifications} onCheckedChange={setSmsNotifications} />
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-foreground">Low Stock Alerts</p>
-                  <p className="text-sm text-muted-foreground">Get notified when inventory is low</p>
+                  <p className="font-semibold text-foreground">Kam qoldiq ogohlantirishlari</p>
+                  <p className="text-sm text-muted-foreground">Ombor qoldig'i kam bo'lganda xabar olish</p>
                 </div>
                 <Switch checked={lowStockAlerts} onCheckedChange={setLowStockAlerts} />
               </div>
 
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="font-semibold text-foreground">Daily Report</p>
-                  <p className="text-sm text-muted-foreground">Receive daily summary at 6 PM</p>
+                  <p className="font-semibold text-foreground">Kunlik hisobot</p>
+                  <p className="text-sm text-muted-foreground">Har kuni soat 18:00 da qisqacha hisobot olish</p>
                 </div>
                 <Switch checked={dailyReport} onCheckedChange={setDailyReport} />
               </div>
 
-              <Button>Save Preferences</Button>
+              <Button>Sozlamalarni saqlash</Button>
             </CardContent>
           </Card>
         </TabsContent>
@@ -392,50 +392,50 @@ export default function SettingsPage() {
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
-              <CardTitle>Password</CardTitle>
-              <CardDescription>Change your account password</CardDescription>
+              <CardTitle>Parol</CardTitle>
+              <CardDescription>Hisob parolingizni o'zgartirish</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <div>
-                <Label htmlFor="currentPassword">Current Password</Label>
+                <Label htmlFor="currentPassword">Joriy parol</Label>
                 <Input id="currentPassword" type="password" />
               </div>
               <div>
-                <Label htmlFor="newPassword">New Password</Label>
+                <Label htmlFor="newPassword">Yangi parol</Label>
                 <Input id="newPassword" type="password" />
               </div>
               <div>
-                <Label htmlFor="confirmPassword">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">Parolni tasdiqlash</Label>
                 <Input id="confirmPassword" type="password" />
               </div>
-              <Button>Update Password</Button>
+              <Button>Parolni yangilash</Button>
             </CardContent>
           </Card>
 
           <Card>
             <CardHeader>
-              <CardTitle>Two-Factor Authentication</CardTitle>
-              <CardDescription>Add an extra layer of security to your account</CardDescription>
+              <CardTitle>Ikki bosqichli autentifikatsiya</CardTitle>
+              <CardDescription>Hisobingizga qo'shimcha xavfsizlik qatlami qo'shing</CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">Two-factor authentication is not currently enabled.</p>
-              <Button>Enable 2FA</Button>
+              <p className="text-sm text-muted-foreground">Ikki bosqichli autentifikatsiya hozirda yoqilmagan.</p>
+              <Button>2FA ni yoqish</Button>
             </CardContent>
           </Card>
 
-          <Card className="border-destructive/50 bg-destructive/5">
+          <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
             <CardHeader>
-              <CardTitle className="text-destructive">Danger Zone</CardTitle>
+              <CardTitle className="text-red-700 dark:text-red-400">Xavfli zona</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
               <div className="flex items-start gap-4">
-                <AlertCircle className="w-5 h-5 text-destructive flex-shrink-0 mt-0.5" />
+                <AlertCircle className="w-5 h-5 text-red-600 dark:text-red-500 flex-shrink-0 mt-0.5" />
                 <div className="flex-1">
-                  <p className="font-semibold text-foreground mb-2">Delete Account</p>
+                  <p className="font-semibold text-foreground mb-2">Hisobni o'chirish</p>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Once you delete your account, there is no going back. Please be certain.
+                    Hisobingizni o'chirsangiz, ortga qaytish yo'q. Iltimos, ishonch hosil qiling.
                   </p>
-                  <Button variant="destructive">Delete Account</Button>
+                  <Button variant="destructive">Hisobni o'chirish</Button>
                 </div>
               </div>
             </CardContent>

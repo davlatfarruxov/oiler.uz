@@ -10,6 +10,7 @@ import { useAppDispatch, useAppSelector } from '@/lib/store/hooks'
 import { logoutUser, getProfile } from '@/lib/store/slices/authSlice'
 import { TenantProvider, useTenant } from '@/lib/contexts/TenantContext'
 import { Button } from '@/components/ui/button'
+import { ThemeToggle } from '@/components/theme-toggle'
 import { cn } from '@/lib/utils'
 import {
   BarChart3,
@@ -28,12 +29,12 @@ import {
 import { Toaster } from 'sonner'
 
 const sidebarItems = [
-  { name: 'Dashboard', href: '/dashboard', icon: BarChart3 },
-  { name: 'Service', href: '/dashboard/service', icon: Wrench },
-  { name: 'Employees', href: '/dashboard/employees', icon: Users },
-  { name: 'Inventory', href: '/dashboard/inventory', icon: Package },
-  { name: 'Archive', href: '/dashboard/archives', icon: Archive },
-  { name: 'Settings', href: '/dashboard/settings', icon: Settings },
+  { name: 'Bosh sahifa', href: '/dashboard', icon: BarChart3 },
+  { name: 'Xizmat', href: '/dashboard/service', icon: Wrench },
+  { name: 'Xodimlar', href: '/dashboard/employees', icon: Users },
+  { name: 'Ombor', href: '/dashboard/inventory', icon: Package },
+  { name: 'Arxiv', href: '/dashboard/archives', icon: Archive },
+  { name: 'Sozlamalar', href: '/dashboard/settings', icon: Settings },
 ]
 
 export default function DashboardLayout({
@@ -79,7 +80,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
-          <p className="mt-4 text-muted-foreground">Loading...</p>
+          <p className="mt-4 text-muted-foreground">Yuklanmoqda...</p>
         </div>
       </div>
     )
@@ -157,7 +158,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             )}
           >
             <LogOut className="w-5 h-5 flex-shrink-0" />
-            {sidebarOpen && <span>Logout</span>}
+            {sidebarOpen && <span>Chiqish</span>}
           </button>
         </div>
       </aside>
@@ -179,7 +180,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </button>
             <div className="flex flex-col">
               <h2 className="text-lg font-semibold text-foreground">
-                {tenant?.companyName || 'Admin Panel'}
+                {tenant?.companyName || 'Boshqaruv paneli'}
               </h2>
               {tenant?.businessEmail && (
                 <span className="text-xs text-muted-foreground">{tenant.businessEmail}</span>
@@ -187,6 +188,7 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           <div className="flex items-center gap-4">
+            <ThemeToggle />
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-medium text-foreground">{user.name}</span>
               <span className="text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</span>

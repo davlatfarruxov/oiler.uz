@@ -46,26 +46,26 @@ export function OverduePaymentsAlert({ overdueServices, totalOverdueAmount }: Ov
   }
 
   return (
-    <Card className="border-destructive/50 bg-destructive/5">
+    <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
       <CardHeader>
         <div className="flex items-center gap-2">
-          <AlertTriangle className="w-5 h-5 text-destructive" />
-          <CardTitle className="text-destructive">Muddati o'tgan to'lovlar</CardTitle>
+          <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-500" />
+          <CardTitle className="text-red-700 dark:text-red-400">Muddati o'tgan to'lovlar</CardTitle>
         </div>
-        <CardDescription>
+        <CardDescription className="text-red-600 dark:text-red-500">
           {overdueServices.length} ta xizmat uchun to'lov muddati o'tgan
         </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
           {/* Total Overdue Amount */}
-          <div className="bg-background p-4 rounded-lg border border-destructive/20">
+          <div className="bg-white dark:bg-gray-800 p-4 rounded-lg border border-red-400 dark:border-red-600">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <DollarSign className="w-5 h-5 text-destructive" />
+                <DollarSign className="w-5 h-5 text-red-600 dark:text-red-500" />
                 <span className="text-sm font-medium">Jami muddati o'tgan qarz:</span>
               </div>
-              <span className="text-xl font-bold text-destructive">
+              <span className="text-xl font-bold text-red-600 dark:text-red-500">
                 {totalOverdueAmount.toLocaleString()} so'm
               </span>
             </div>
@@ -78,7 +78,7 @@ export function OverduePaymentsAlert({ overdueServices, totalOverdueAmount }: Ov
               return (
                 <div
                   key={service._id}
-                  className="bg-background p-3 rounded-lg border border-border hover:border-destructive/50 transition-colors cursor-pointer"
+                  className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-red-300 dark:border-red-700 hover:border-red-500 dark:hover:border-red-500 transition-colors cursor-pointer"
                   onClick={() => router.push(`/dashboard/service/${service.vehicle._id}`)}
                 >
                   <div className="flex items-start justify-between gap-3">
@@ -87,7 +87,7 @@ export function OverduePaymentsAlert({ overdueServices, totalOverdueAmount }: Ov
                         <p className="font-semibold text-foreground truncate">
                           {service.vehicle.plateNumber}
                         </p>
-                        <Badge variant="destructive" className="text-xs">
+                        <Badge variant="destructive" className="text-xs bg-red-600 hover:bg-red-700">
                           {daysOverdue} kun kechikkan
                         </Badge>
                       </div>
@@ -104,7 +104,7 @@ export function OverduePaymentsAlert({ overdueServices, totalOverdueAmount }: Ov
                       </div>
                     </div>
                     <div className="text-right">
-                      <p className="text-lg font-bold text-destructive">
+                      <p className="text-lg font-bold text-red-600 dark:text-red-500">
                         {(service.amountDue || 0).toLocaleString()}
                       </p>
                       <p className="text-xs text-muted-foreground">so'm</p>

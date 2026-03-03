@@ -26,6 +26,9 @@ router.get('/archived', authenticate, vehicleController.getArchivedVehicles.bind
 // Get vehicle count
 router.get('/count', authenticate, vehicleController.getVehiclesCount.bind(vehicleController));
 
+// Get all active services (oil changes + general services)
+router.get('/active-services', authenticate, vehicleController.getActiveServices.bind(vehicleController));
+
 // Get all vehicles
 router.get('/', authenticate, vehicleController.getAllVehicles.bind(vehicleController));
 

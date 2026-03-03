@@ -28,11 +28,20 @@ router.get('/', employeeController.getAllEmployees.bind(employeeController));
 // Get employee statistics
 router.get('/stats', employeeController.getEmployeeStats.bind(employeeController));
 
+// Get total employee debt across all employees
+router.get('/debt/total', employeeController.getTotalEmployeeDebt.bind(employeeController));
+
 // Get single employee with performance
 router.get('/:id', employeeController.getEmployeeById.bind(employeeController));
 
 // Get employee performance
 router.get('/:id/performance', employeeController.getEmployeePerformance.bind(employeeController));
+
+// Get employee statistics
+router.get('/:id/statistics', employeeController.getEmployeeStatistics.bind(employeeController));
+
+// Get employee services history
+router.get('/:id/services', employeeController.getEmployeeServices.bind(employeeController));
 
 // Create new employee (Admin/SuperAdmin only)
 router.post(

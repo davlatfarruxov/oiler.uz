@@ -55,6 +55,7 @@ interface ListServicesFilters {
   vehicleId?: string;
   customerId?: string;
   paymentStatus?: 'paid' | 'partial' | 'unpaid';
+  status?: 'active' | 'completed';
 }
 
 export class ServiceService {
@@ -457,6 +458,10 @@ export class ServiceService {
       query.paymentStatus = filters.paymentStatus;
     }
 
+    if (filters.status) {
+      query.status = filters.status;
+    }
+
     const services = await Service.find(query)
       .sort({ createdAt: -1 })
       .populate([
@@ -536,6 +541,54 @@ export class ServiceService {
         }
       }
     }
+  }
+
+  async completeService(
+    tenantId: string,
+    serviceId: string,
+    userId: string
+  ): Promise<IServiceDocument> {
+    const service = await Service.findOne({
+      _id: serviceId,
+      tenant: tenantId
+    });
+
+    if (!service) {
+      throw new ApiError(404, 'Service not found');
+    }
+
+    if (service.status === 'completed') {
+      throw new ApiError(400, 'Service is already completed');
+    }
+
+    const changes: any[] = [{
+      field: 'status',
+      oldValue: service.status,
+      newValue: 'completed'
+    }];
+
+    service.status = 'completed';
+    service.completedAt = new Date();
+
+    await service.save();
+
+    await this.archiveService.createArchiveEntry(
+      tenantId,
+      'Service',
+      serviceId,
+      'updated',
+      service.toObject(),
+      userId,
+      changes,
+      'Service completed'
+    );
+
+    return service.populate([
+      'vehicle',
+      'customer',
+      { path: 'services.employees', model: 'Employee' },
+      { path: 'services.items.inventoryId', model: 'UniversalInventory' }
+    ]);
   }
 }
 

@@ -270,11 +270,18 @@ export class OilChangeService {
       .populate('customer', 'name phone')
       .populate('employees', 'name')
       .populate('employeeCommissions.employee', 'name')
-      .populate('oilProduct', 'brand viscosity apiGrade volume')
-      .populate('oilFilter', 'brand partNumber')
-      .populate('airFilter', 'brand partNumber')
-      .populate('cabinFilter', 'brand partNumber')
-      .populate('fuelFilter', 'brand partNumber')
+      .populate({
+        path: 'oilProduct',
+        select: 'brand viscosity apiGrade volume',
+        populate: {
+          path: 'brand',
+          select: 'name'
+        }
+      })
+      .populate('oilFilter', 'brandName partNumber')
+      .populate('airFilter', 'brandName partNumber')
+      .populate('cabinFilter', 'brandName partNumber')
+      .populate('fuelFilter', 'brandName partNumber')
       .populate('additionalProducts.product')
       .lean();
     
@@ -282,7 +289,77 @@ export class OilChangeService {
       throw new ApiError(404, 'Oil change not found');
     }
     
+    // Transform oilProduct.brand to string for frontend
+    if (oilChange.oilProduct && typeof oilChange.oilProduct === 'object') {
+      const oilProduct = oilChange.oilProduct as any;
+      if (oilProduct.brand && typeof oilProduct.brand === 'object' && oilProduct.brand.name) {
+        oilProduct.brandName = oilProduct.brand.name;
+        oilProduct.brand = oilProduct.brand.name; // Replace object with string
+      }
+    }
+    
+    console.log('Backend - Oil change oilProduct after transform:', oilChange.oilProduct);
+    
     return oilChange;
+  }
+
+  async getOilChangeByIdPublic(oilChangeId: string) {
+    const oilChange = await OilChange.findOne({ _id: oilChangeId })
+      .populate('vehicle', 'plateNumber brand vehicleModel engineType')
+      .populate('employees', 'name')
+      .populate({
+        path: 'oilProduct',
+        select: 'brand viscosity apiGrade volume',
+        populate: {
+          path: 'brand',
+          select: 'name'
+        }
+      })
+      .populate('oilFilter', 'brandName partNumber')
+      .populate('airFilter', 'brandName partNumber')
+      .populate('cabinFilter', 'brandName partNumber')
+      .populate('fuelFilter', 'brandName partNumber')
+      .lean();
+    
+    if (!oilChange) {
+      throw new ApiError(404, 'Oil change not found');
+    }
+    
+    // Transform oilProduct.brand to string for frontend
+    if (oilChange.oilProduct && typeof oilChange.oilProduct === 'object') {
+      const oilProduct = oilChange.oilProduct as any;
+      if (oilProduct.brand && typeof oilProduct.brand === 'object' && oilProduct.brand.name) {
+        oilProduct.brand = oilProduct.brand.name;
+      }
+    }
+    
+    // Remove sensitive data
+    const publicData = {
+      _id: oilChange._id,
+      vehicle: oilChange.vehicle,
+      employees: oilChange.employees,
+      oilProduct: oilChange.oilProduct,
+      oilProductCustomerProvided: oilChange.oilProductCustomerProvided,
+      oilProductCustomerProvidedDetails: oilChange.oilProductCustomerProvidedDetails,
+      oilQuantityUsed: oilChange.oilQuantityUsed,
+      oilFilter: oilChange.oilFilter,
+      oilFilterCustomerProvided: oilChange.oilFilterCustomerProvided,
+      oilFilterCustomerProvidedDetails: oilChange.oilFilterCustomerProvidedDetails,
+      airFilter: oilChange.airFilter,
+      airFilterCustomerProvided: oilChange.airFilterCustomerProvided,
+      airFilterCustomerProvidedDetails: oilChange.airFilterCustomerProvidedDetails,
+      cabinFilter: oilChange.cabinFilter,
+      cabinFilterCustomerProvided: oilChange.cabinFilterCustomerProvided,
+      cabinFilterCustomerProvidedDetails: oilChange.cabinFilterCustomerProvidedDetails,
+      fuelFilter: oilChange.fuelFilter,
+      fuelFilterCustomerProvided: oilChange.fuelFilterCustomerProvided,
+      fuelFilterCustomerProvidedDetails: oilChange.fuelFilterCustomerProvidedDetails,
+      mileage: oilChange.mileage,
+      nextServiceMileage: oilChange.nextServiceMileage,
+      createdAt: oilChange.createdAt
+    };
+    
+    return publicData;
   }
 
   async getTodayCount(tenantId: string): Promise<number> {
@@ -798,7 +875,14 @@ export class OilChangeService {
     }
 
     // If price changed, recalculate amountDue
-    if (data.price !== undefined && data.price !== oilChange.price) {
+    if (data.price !== undefined) {
+      console.log('Price update:', {
+        oldPrice: oilChange.price,
+        newPrice: data.price,
+        paymentStatus: oilChange.paymentStatus,
+        amountPaid: oilChange.amountPaid
+      });
+      
       const oldPrice = oilChange.price;
       const oldAmountDue = oilChange.amountDue;
       
@@ -814,10 +898,77 @@ export class OilChangeService {
         oilChange.amountDue = data.price;
       }
       
-      changes.push({ field: 'price', oldValue: oldPrice, newValue: data.price });
+      console.log('After calculation:', {
+        newPrice: oilChange.price,
+        newAmountDue: oilChange.amountDue
+      });
+      
+      if (oldPrice !== data.price) {
+        changes.push({ field: 'price', oldValue: oldPrice, newValue: data.price });
+      }
       
       if (oldAmountDue !== oilChange.amountDue) {
         changes.push({ field: 'amountDue', oldValue: oldAmountDue, newValue: oilChange.amountDue });
+      }
+    }
+    
+    // If price not provided, recalculate from products and labor
+    if (data.price === undefined) {
+      const oldPrice = oilChange.price;
+      let calculatedPrice = oilChange.laborCost || 0;
+      
+      // Add oil product price
+      if (oilChange.oilProduct && !oilChange.oilProductCustomerProvided) {
+        const oilProduct = await OilProduct.findById(oilChange.oilProduct);
+        if (oilProduct && oilChange.oilQuantityUsed) {
+          const pricePerLiter = oilProduct.price / oilProduct.volume;
+          calculatedPrice += pricePerLiter * oilChange.oilQuantityUsed;
+        }
+      }
+      
+      // Add filter prices
+      if (oilChange.oilFilter && !oilChange.oilFilterCustomerProvided) {
+        const filter = await Filter.findById(oilChange.oilFilter);
+        if (filter) calculatedPrice += filter.price;
+      }
+      if (oilChange.airFilter && !oilChange.airFilterCustomerProvided) {
+        const filter = await Filter.findById(oilChange.airFilter);
+        if (filter) calculatedPrice += filter.price;
+      }
+      if (oilChange.cabinFilter && !oilChange.cabinFilterCustomerProvided) {
+        const filter = await Filter.findById(oilChange.cabinFilter);
+        if (filter) calculatedPrice += filter.price;
+      }
+      if (oilChange.fuelFilter && !oilChange.fuelFilterCustomerProvided) {
+        const filter = await Filter.findById(oilChange.fuelFilter);
+        if (filter) calculatedPrice += filter.price;
+      }
+      
+      // Add additional products
+      if (oilChange.additionalProducts && oilChange.additionalProducts.length > 0) {
+        for (const ap of oilChange.additionalProducts) {
+          calculatedPrice += ap.price * ap.quantity;
+        }
+      }
+      
+      // Update price if changed
+      if (oldPrice !== calculatedPrice) {
+        oilChange.price = calculatedPrice;
+        changes.push({ field: 'price', oldValue: oldPrice, newValue: calculatedPrice });
+        
+        // Recalculate amountDue
+        const oldAmountDue = oilChange.amountDue;
+        if (oilChange.paymentStatus === 'paid') {
+          oilChange.amountDue = 0;
+        } else if (oilChange.paymentStatus === 'partial') {
+          oilChange.amountDue = calculatedPrice - oilChange.amountPaid;
+        } else {
+          oilChange.amountDue = calculatedPrice;
+        }
+        
+        if (oldAmountDue !== oilChange.amountDue) {
+          changes.push({ field: 'amountDue', oldValue: oldAmountDue, newValue: oilChange.amountDue });
+        }
       }
     }
 
@@ -846,5 +997,40 @@ export class OilChangeService {
     }
 
     return oilChange;
+  }
+
+  async completeOilChange(tenantId: string, oilChangeId: string, userId: string): Promise<IOilChangeDocument> {
+    const oilChange = await OilChange.findOne({ 
+      _id: oilChangeId,
+      tenant: tenantId 
+    });
+    
+    if (!oilChange) {
+      throw new ApiError(404, 'Oil change not found');
+    }
+
+    if (oilChange.status === 'completed') {
+      throw new ApiError(400, 'Oil change is already completed');
+    }
+
+    const oldStatus = oilChange.status;
+    oilChange.status = 'completed';
+    oilChange.completedAt = new Date();
+    
+    await oilChange.save();
+
+    // Create archive entry for status change
+    await archiveService.createArchiveEntry(
+      tenantId,
+      'OilChange',
+      oilChangeId,
+      'updated',
+      oilChange.toObject(),
+      userId,
+      [{ field: 'status', oldValue: oldStatus, newValue: 'completed' }],
+      'Oil change completed'
+    );
+
+    return oilChange.populate(['vehicle', 'customer', 'employees', 'employeeCommissions.employee', 'oilProduct', 'oilFilter']);
   }
 }

@@ -51,6 +51,13 @@ router.put(
   generalServiceController.updateService.bind(generalServiceController)
 );
 
+// Complete service
+router.post(
+  '/:id/complete',
+  authorize(UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.SUPER_ADMIN),
+  generalServiceController.completeService.bind(generalServiceController)
+);
+
 // Archive service
 router.post(
   '/:id/archive',

@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Download, ArrowUpDown, Filter } from 'lucide-react'
 import { useState } from 'react'
+import { formatDate } from '@/lib/utils/dateFormat'
 
 interface Transaction {
   _id: string
@@ -26,9 +27,20 @@ interface Transaction {
 interface PaymentHistoryTableProps {
   transactions: Transaction[]
   onExport?: () => void
+  currentPage?: number
+  totalPages?: number
+  totalRecords?: number
+  onPageChange?: (page: number) => void
 }
 
-export function PaymentHistoryTable({ transactions, onExport }: PaymentHistoryTableProps) {
+export function PaymentHistoryTable({ 
+  transactions, 
+  onExport,
+  currentPage = 1,
+  totalPages = 1,
+  totalRecords = 0,
+  onPageChange
+}: PaymentHistoryTableProps) {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc')
   const [filterType, setFilterType] = useState<'all' | 'service' | 'payment'>('all')
   const [filterPaymentStatus, setFilterPaymentStatus] = useState<'all' | 'paid' | 'partial' | 'unpaid'>('all')
@@ -66,11 +78,7 @@ export function PaymentHistoryTable({ transactions, onExport }: PaymentHistoryTa
     // Create CSV content
     const headers = ['Sana', 'Turi', 'Tafsilot', 'Summa', 'Balans']
     const rows = sortedTransactions.map(transaction => {
-      const date = new Date(transaction.date).toLocaleDateString('uz-UZ', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      })
+      const date = formatDate(transaction.date)
       const type = transaction.type === 'service' ? 'Xizmat' : 'To\'lov'
       
       let details = ''
@@ -208,11 +216,7 @@ export function PaymentHistoryTable({ transactions, onExport }: PaymentHistoryTa
               sortedTransactions.map((transaction) => (
                 <TableRow key={transaction._id}>
                   <TableCell className="font-medium">
-                    {new Date(transaction.date).toLocaleDateString('uz-UZ', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric'
-                    })}
+                    {formatDate(transaction.date)}
                   </TableCell>
                   <TableCell>
                     {transaction.type === 'service' ? (
@@ -234,7 +238,10 @@ export function PaymentHistoryTable({ transactions, onExport }: PaymentHistoryTa
                               transaction.paymentStatus === 'partial' ? 'secondary' : 
                               'destructive'
                             }
-                            className="text-xs"
+                            className={`text-xs ${
+                              transaction.paymentStatus === 'paid' ? 'bg-green-600 hover:bg-green-700' :
+                              transaction.paymentStatus === 'unpaid' ? 'bg-red-600 hover:bg-red-700' : ''
+                            }`}
                           >
                             {transaction.paymentStatus === 'paid' ? 'To\'langan' : 
                              transaction.paymentStatus === 'partial' ? 'Qisman' : 
@@ -259,7 +266,11 @@ export function PaymentHistoryTable({ transactions, onExport }: PaymentHistoryTa
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <span className={transaction.type === 'service' ? 'text-red-600' : 'text-green-600'}>
+                    <span className={
+                      transaction.type === 'service' 
+                        ? (transaction.paymentStatus === 'paid' ? 'text-green-600 dark:text-green-500' : 'text-red-600 dark:text-red-500')
+                        : 'text-green-600 dark:text-green-500'
+                    }>
                       {transaction.type === 'service' ? '+' : '-'}
                       {(transaction.amount || 0).toLocaleString()} so'm
                     </span>
@@ -274,9 +285,38 @@ export function PaymentHistoryTable({ transactions, onExport }: PaymentHistoryTa
         </Table>
       </div>
 
-      <div className="text-sm text-muted-foreground text-right">
-        Ko'rsatilmoqda: {sortedTransactions.length} / {transactions.length} ta operatsiya
-      </div>
+      {/* Pagination Controls */}
+      {onPageChange && totalPages > 1 && (
+        <div className="flex items-center justify-between">
+          <div className="text-sm text-muted-foreground">
+            Sahifa {currentPage} / {totalPages} (Jami: {totalRecords} ta)
+          </div>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage - 1)}
+              disabled={currentPage === 1}
+            >
+              Oldingi
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => onPageChange(currentPage + 1)}
+              disabled={currentPage === totalPages}
+            >
+              Keyingi
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {!onPageChange && (
+        <div className="text-sm text-muted-foreground text-right">
+          Ko'rsatilmoqda: {sortedTransactions.length} / {transactions.length} ta operatsiya
+        </div>
+      )}
     </div>
   )
 }

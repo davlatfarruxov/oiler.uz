@@ -489,8 +489,8 @@ export default function InventoryPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Inventory Management</h1>
-          <p className="text-muted-foreground mt-1">Manage oils, filters, and products</p>
+          <h1 className="text-3xl font-bold text-foreground">Ombor boshqaruvi</h1>
+          <p className="text-muted-foreground mt-1">Moylar, filterlar va mahsulotlarni boshqarish</p>
         </div>
       </div>
 
@@ -499,7 +499,7 @@ export default function InventoryPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total Inventory Value</p>
+                <p className="text-sm text-muted-foreground">Jami ombor qiymati</p>
                 {isLoading ? (
                   <Loader2 className="h-6 w-6 animate-spin text-muted-foreground mt-2" />
                 ) : (
@@ -517,11 +517,11 @@ export default function InventoryPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Total SKUs</p>
+                <p className="text-sm text-muted-foreground">Jami mahsulotlar</p>
                 <p className="text-2xl font-bold text-foreground mt-2">{items.length}</p>
               </div>
-              <div className="p-3 bg-blue-100 rounded-lg">
-                <AlertCircle className="w-6 h-6 text-blue-600" />
+              <div className="p-3 bg-blue-100 dark:bg-blue-950/50 rounded-lg">
+                <AlertCircle className="w-6 h-6 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </CardContent>
@@ -531,11 +531,11 @@ export default function InventoryPage() {
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-sm text-muted-foreground">Low Stock Alerts</p>
-                <p className="text-2xl font-bold text-destructive mt-2">{lowStockItems.length}</p>
+                <p className="text-sm text-muted-foreground">Kam qolgan mahsulotlar</p>
+                <p className="text-2xl font-bold text-red-600 dark:text-red-500 mt-2">{lowStockItems.length}</p>
               </div>
-              <div className="p-3 bg-red-100 rounded-lg">
-                <AlertTriangle className="w-6 h-6 text-red-600" />
+              <div className="p-3 bg-red-100 dark:bg-red-900/30 rounded-lg">
+                <AlertTriangle className="w-6 h-6 text-red-600 dark:text-red-500" />
               </div>
             </div>
           </CardContent>
@@ -543,18 +543,18 @@ export default function InventoryPage() {
       </div>
 
       {lowStockItems.length > 0 && (
-        <Card className="border-destructive/50 bg-destructive/5">
+        <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
           <CardHeader>
-            <CardTitle className="text-destructive flex items-center gap-2">
+            <CardTitle className="text-red-700 dark:text-red-400 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" />
-              Low Stock Alert
+              Kam qolgan mahsulotlar ogohlantirishi
             </CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
               {lowStockItems.map((item: any) => (
                 <p key={item._id} className="text-sm text-foreground">
-                  <strong>{item.name}</strong> - Only {item.stock} units left (reorder at {item.reorderLevel})
+                  <strong>{item.name}</strong> - Faqat {item.stock} dona qoldi (qayta buyurtma: {item.reorderLevel})
                 </p>
               ))}
             </div>
@@ -564,15 +564,14 @@ export default function InventoryPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Inventory</CardTitle>
+          <CardTitle>Ombor</CardTitle>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="oil-products" className="space-y-4">
             <TabsList>
-              <TabsTrigger value="oil-products">Oil Products ({oilBrands.length} brands)</TabsTrigger>
-              <TabsTrigger value="oils">Oils ({oils.length})</TabsTrigger>
-              <TabsTrigger value="filters">Filters ({Array.from(new Set(filters.map(f => f.brandName))).length} brands)</TabsTrigger>
-              <TabsTrigger value="products">Products ({products.length})</TabsTrigger>
+              <TabsTrigger value="oil-products">Moy mahsulotlari ({oilBrands.length} brend)</TabsTrigger>
+              <TabsTrigger value="filters">Filterlar ({Array.from(new Set(filters.map(f => f.brandName))).length} brend)</TabsTrigger>
+              <TabsTrigger value="products">Mahsulotlar ({products.length})</TabsTrigger>
             </TabsList>
 
             <TabsContent value="oil-products" className="space-y-4">
@@ -581,7 +580,7 @@ export default function InventoryPage() {
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Brands</CardTitle>
+                      <CardTitle className="text-lg">Brendlar</CardTitle>
                       <Button size="sm" onClick={openAddBrandDialog}>
                         <Plus className="w-3 h-3" />
                       </Button>
@@ -591,7 +590,7 @@ export default function InventoryPage() {
                     {isLoading ? (
                       <Loader2 className="h-6 w-6 animate-spin mx-auto" />
                     ) : oilBrands.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">No brands yet</p>
+                      <p className="text-sm text-muted-foreground text-center py-4">Hali brendlar yo'q</p>
                     ) : (
                       <div className="space-y-2">
                         {oilBrands.map((brand) => (
@@ -647,16 +646,16 @@ export default function InventoryPage() {
                       {selectedBrand && (
                         <Button size="sm" onClick={openAddVariantDialog}>
                           <Plus className="w-3 h-3 mr-1" />
-                          Add Variant
+                          Variant qo'shish
                         </Button>
                       )}
                     </div>
                   </CardHeader>
                   <CardContent>
                     {!selectedBrand ? (
-                      <p className="text-center text-muted-foreground py-8">Select a brand to view variants</p>
+                      <p className="text-center text-muted-foreground py-8">Variantlarni ko'rish uchun brendni tanlang</p>
                     ) : brandProducts.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">No variants yet. Add your first variant!</p>
+                      <p className="text-center text-muted-foreground py-8">Hali variantlar yo'q. Birinchi variantni qo'shing!</p>
                     ) : (
                       <div className="space-y-3">
                         {brandProducts.map((product) => {
@@ -746,27 +745,13 @@ export default function InventoryPage() {
               </div>
             </TabsContent>
 
-            <TabsContent value="oils" className="space-y-4">
-              <Button onClick={() => openAddDialog('oil')} className="gap-2 mb-4">
-                <Plus className="w-4 h-4" />
-                Add Oil Type
-              </Button>
-              {isLoading ? (
-                <div className="flex justify-center py-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-                </div>
-              ) : (
-                <InventoryTable items={oils} onEdit={openEditDialog} onDelete={handleDeleteItem} />
-              )}
-            </TabsContent>
-
             <TabsContent value="filters" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Filter Brands list */}
                 <Card>
                   <CardHeader>
                     <div className="flex items-center justify-between">
-                      <CardTitle className="text-lg">Filter Brands</CardTitle>
+                      <CardTitle className="text-lg">Filter brendlari</CardTitle>
                     </div>
                   </CardHeader>
                   <CardContent>
@@ -775,7 +760,7 @@ export default function InventoryPage() {
                     ) : (() => {
                       const uniqueBrands = Array.from(new Set(filters.map(f => f.brandName))).sort()
                       return uniqueBrands.length === 0 ? (
-                        <p className="text-sm text-muted-foreground text-center py-4">No filters yet</p>
+                        <p className="text-sm text-muted-foreground text-center py-4">Hali filterlar yo'q</p>
                       ) : (
                         <div className="space-y-2">
                           {uniqueBrands.map((brandName) => {
@@ -829,15 +814,15 @@ export default function InventoryPage() {
                         setOpenFilterDialog(true)
                       }}>
                         <Plus className="w-3 h-3 mr-1" />
-                        Add Filter
+                        Filter qo'shish
                       </Button>
                     </div>
                   </CardHeader>
                   <CardContent>
                     {!selectedFilterBrand ? (
-                      <p className="text-center text-muted-foreground py-8">Select a brand to view filters</p>
+                      <p className="text-center text-muted-foreground py-8">Filterlarni ko'rish uchun brendni tanlang</p>
                     ) : brandFilters.length === 0 ? (
-                      <p className="text-center text-muted-foreground py-8">No filters yet. Add your first filter!</p>
+                      <p className="text-center text-muted-foreground py-8">Hali filterlar yo'q. Birinchi filterni qo'shing!</p>
                     ) : (
                       <div className="space-y-3">
                         {brandFilters.map((filter) => {
@@ -850,10 +835,10 @@ export default function InventoryPage() {
                           const profitPercent = costInUZS > 0 ? ((profit / costInUZS) * 100).toFixed(1) : '0'
 
                           const filterTypeLabels: any = {
-                            oil_filter: 'Oil Filter',
-                            air_filter: 'Air Filter',
-                            cabin_filter: 'Cabin Filter',
-                            fuel_filter: 'Fuel Filter'
+                            oil_filter: 'Moy filteri',
+                            air_filter: 'Havo filteri',
+                            cabin_filter: 'Salon filteri',
+                            fuel_filter: 'Yoqilg\'i filteri'
                           }
 
                           return (
@@ -870,7 +855,7 @@ export default function InventoryPage() {
                                   </div>
                                   {filter.compatibleVehicles && filter.compatibleVehicles.length > 0 && (
                                     <p className="text-xs text-muted-foreground mb-2">
-                                      Compatible: {filter.compatibleVehicles.join(', ')}
+                                      Mos keladi: {filter.compatibleVehicles.join(', ')}
                                     </p>
                                   )}
                                   <div className="space-y-1">
@@ -972,7 +957,7 @@ export default function InventoryPage() {
             <TabsContent value="products" className="space-y-4">
               <Button onClick={() => openAddDialog('other')} className="gap-2 mb-4">
                 <Plus className="w-4 h-4" />
-                Add Product
+                Mahsulot qo'shish
               </Button>
               {isLoading ? (
                 <div className="flex justify-center py-8">
@@ -989,12 +974,12 @@ export default function InventoryPage() {
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>{editingItem ? 'Edit Item' : 'Add New Item'}</DialogTitle>
-            <DialogDescription>Update the inventory item details</DialogDescription>
+            <DialogTitle>{editingItem ? 'Mahsulotni tahrirlash' : 'Yangi mahsulot qo\'shish'}</DialogTitle>
+            <DialogDescription>Ombor mahsuloti ma'lumotlarini yangilash</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveItem} className="space-y-4">
             <div>
-              <Label htmlFor="name">Product Name *</Label>
+              <Label htmlFor="name">Mahsulot nomi *</Label>
               <Input
                 id="name"
                 value={newItem.name}
@@ -1003,7 +988,7 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <Label htmlFor="price">Price *</Label>
+              <Label htmlFor="price">Narx *</Label>
               <Input
                 id="price"
                 type="number"
@@ -1014,7 +999,7 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <Label htmlFor="stock">Stock *</Label>
+              <Label htmlFor="stock">Omborda *</Label>
               <Input
                 id="stock"
                 type="number"
@@ -1025,7 +1010,7 @@ export default function InventoryPage() {
             </div>
             {newItem.productType !== 'other' && (
               <div>
-                <Label htmlFor="reorder">Reorder Level</Label>
+                <Label htmlFor="reorder">Qayta buyurtma darajasi</Label>
                 <Input
                   id="reorder"
                   type="number"
@@ -1039,14 +1024,14 @@ export default function InventoryPage() {
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saqlanmoqda...
                   </>
                 ) : (
-                  editingItem ? 'Update' : 'Add'
+                  editingItem ? 'Yangilash' : 'Qo\'shish'
                 )}
               </Button>
               <Button type="button" variant="outline" onClick={() => setOpenDialog(false)}>
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </form>
@@ -1056,12 +1041,12 @@ export default function InventoryPage() {
       <Dialog open={openBrandDialog} onOpenChange={setOpenBrandDialog}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{editingBrand ? 'Edit Brand' : 'Add Brand'}</DialogTitle>
-            <DialogDescription>Enter the brand details</DialogDescription>
+            <DialogTitle>{editingBrand ? 'Brendni tahrirlash' : 'Brend qo\'shish'}</DialogTitle>
+            <DialogDescription>Brend ma'lumotlarini kiriting</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveBrand} className="space-y-4">
             <div>
-              <Label htmlFor="brandName">Brand Name *</Label>
+              <Label htmlFor="brandName">Brend nomi *</Label>
               <Input
                 id="brandName"
                 value={newBrand.name}
@@ -1071,12 +1056,12 @@ export default function InventoryPage() {
               />
             </div>
             <div>
-              <Label htmlFor="brandDesc">Description (Optional)</Label>
+              <Label htmlFor="brandDesc">Tavsif (Ixtiyoriy)</Label>
               <Input
                 id="brandDesc"
                 value={newBrand.description}
                 onChange={(e) => setNewBrand({ ...newBrand, description: e.target.value })}
-                placeholder="Premium quality oil..."
+                placeholder="Yuqori sifatli moy..."
               />
             </div>
             <div className="flex gap-2">
@@ -1084,14 +1069,14 @@ export default function InventoryPage() {
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saqlanmoqda...
                   </>
                 ) : (
-                  editingBrand ? 'Update Brand' : 'Add Brand'
+                  editingBrand ? 'Brendni yangilash' : 'Brend qo\'shish'
                 )}
               </Button>
               <Button type="button" variant="outline" onClick={() => setOpenBrandDialog(false)}>
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </form>
@@ -1102,14 +1087,14 @@ export default function InventoryPage() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {editingVariant ? 'Edit Variant' : `Add Variant for ${selectedBrand?.name}`}
+              {editingVariant ? 'Variantni tahrirlash' : `${selectedBrand?.name} uchun variant qo'shish`}
             </DialogTitle>
-            <DialogDescription>Enter the variant specifications</DialogDescription>
+            <DialogDescription>Variant xususiyatlarini kiriting</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveVariant} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="viscosity">Viscosity *</Label>
+                <Label htmlFor="viscosity">Qovushqoqlik *</Label>
                 <Input
                   id="viscosity"
                   value={newVariant.viscosity}
@@ -1119,7 +1104,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="apiGrade">API Grade *</Label>
+                <Label htmlFor="apiGrade">API daraja *</Label>
                 <Input
                   id="apiGrade"
                   value={newVariant.apiGrade}
@@ -1131,7 +1116,7 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="volume">Volume (Liters) *</Label>
+                <Label htmlFor="volume">Hajm (Litr) *</Label>
                 <Input
                   id="volume"
                   type="number"
@@ -1143,7 +1128,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="variantStock">Stock *</Label>
+                <Label htmlFor="variantStock">Omborda *</Label>
                 <Input
                   id="variantStock"
                   type="number"
@@ -1156,7 +1141,7 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label htmlFor="costPrice">Cost Price *</Label>
+                <Label htmlFor="costPrice">Xarajat narxi *</Label>
                 <Input
                   id="costPrice"
                   type="number"
@@ -1167,7 +1152,7 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <Label htmlFor="costCurrency">Currency *</Label>
+                <Label htmlFor="costCurrency">Valyuta *</Label>
                 <Select value={newVariant.costCurrency} onValueChange={(value) => setNewVariant({ ...newVariant, costCurrency: value })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -1179,7 +1164,7 @@ export default function InventoryPage() {
                 </Select>
               </div>
               <div>
-                <Label htmlFor="variantPrice">Sale Price (UZS) *</Label>
+                <Label htmlFor="variantPrice">Sotish narxi (UZS) *</Label>
                 <Input
                   id="variantPrice"
                   type="number"
@@ -1192,7 +1177,7 @@ export default function InventoryPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="reorderLevel">Reorder Level</Label>
+                <Label htmlFor="reorderLevel">Qayta buyurtma darajasi</Label>
                 <Input
                   id="reorderLevel"
                   type="number"
@@ -1207,14 +1192,14 @@ export default function InventoryPage() {
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving...
+                    Saqlanmoqda...
                   </>
                 ) : (
-                  editingVariant ? 'Update Variant' : 'Add Variant'
+                  editingVariant ? 'Variantni yangilash' : 'Variant qo\'shish'
                 )}
               </Button>
               <Button type="button" variant="outline" onClick={() => setOpenVariantDialog(false)}>
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </form>
@@ -1225,13 +1210,13 @@ export default function InventoryPage() {
       <Dialog open={openFilterDialog} onOpenChange={setOpenFilterDialog}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingFilter ? 'Edit Filter' : 'Add New Filter'}</DialogTitle>
-            <DialogDescription>Enter filter details</DialogDescription>
+            <DialogTitle>{editingFilter ? 'Filterni tahrirlash' : 'Yangi filter qo\'shish'}</DialogTitle>
+            <DialogDescription>Filter ma'lumotlarini kiriting</DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSaveFilter} className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Brand *</Label>
+                <Label>Brend *</Label>
                 <Input
                   value={newFilter.brandName}
                   onChange={(e) => setNewFilter({ ...newFilter, brandName: e.target.value })}
@@ -1240,16 +1225,16 @@ export default function InventoryPage() {
                 />
               </div>
               <div>
-                <Label>Filter Type *</Label>
+                <Label>Filter turi *</Label>
                 <Select value={newFilter.filterType} onValueChange={(value) => setNewFilter({ ...newFilter, filterType: value })}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="oil_filter">Oil Filter</SelectItem>
-                    <SelectItem value="air_filter">Air Filter</SelectItem>
-                    <SelectItem value="cabin_filter">Cabin Filter</SelectItem>
-                    <SelectItem value="fuel_filter">Fuel Filter</SelectItem>
+                    <SelectItem value="oil_filter">Moy filteri</SelectItem>
+                    <SelectItem value="air_filter">Havo filteri</SelectItem>
+                    <SelectItem value="cabin_filter">Salon filteri</SelectItem>
+                    <SelectItem value="fuel_filter">Yoqilg'i filteri</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1257,28 +1242,28 @@ export default function InventoryPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Part Number *</Label>
+                <Label>Qism raqami *</Label>
                 <Input value={newFilter.partNumber} onChange={(e) => setNewFilter({ ...newFilter, partNumber: e.target.value })} placeholder="W 712/75" required />
               </div>
               <div>
-                <Label>Quality *</Label>
-                <Input value={newFilter.quality} onChange={(e) => setNewFilter({ ...newFilter, quality: e.target.value })} placeholder="Premium, Standard, Economy" required />
+                <Label>Sifat *</Label>
+                <Input value={newFilter.quality} onChange={(e) => setNewFilter({ ...newFilter, quality: e.target.value })} placeholder="Premium, Standart, Ekonom" required />
               </div>
             </div>
 
             <div>
-              <Label>Compatible Vehicles</Label>
+              <Label>Mos keladigan mashinalar</Label>
               <Input value={newFilter.compatibleVehicles} onChange={(e) => setNewFilter({ ...newFilter, compatibleVehicles: e.target.value })} placeholder="Toyota Camry, Honda Accord" />
-              <p className="text-xs text-muted-foreground mt-1">Comma-separated</p>
+              <p className="text-xs text-muted-foreground mt-1">Vergul bilan ajratilgan</p>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div>
-                <Label>Cost Price *</Label>
+                <Label>Xarajat narxi *</Label>
                 <Input type="number" step="0.01" value={newFilter.costPrice} onChange={(e) => setNewFilter({ ...newFilter, costPrice: e.target.value })} required />
               </div>
               <div>
-                <Label>Currency *</Label>
+                <Label>Valyuta *</Label>
                 <Select value={newFilter.costCurrency} onValueChange={(value: 'USD' | 'UZS') => setNewFilter({ ...newFilter, costCurrency: value })}>
                   <SelectTrigger>
                     <SelectValue />
@@ -1290,27 +1275,27 @@ export default function InventoryPage() {
                 </Select>
               </div>
               <div>
-                <Label>Sale Price (UZS) *</Label>
+                <Label>Sotish narxi (UZS) *</Label>
                 <Input type="number" value={newFilter.price} onChange={(e) => setNewFilter({ ...newFilter, price: e.target.value })} required />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <Label>Stock *</Label>
+                <Label>Omborda *</Label>
                 <Input type="number" value={newFilter.stock} onChange={(e) => setNewFilter({ ...newFilter, stock: e.target.value })} required />
               </div>
               <div>
-                <Label>Reorder Level</Label>
+                <Label>Qayta buyurtma darajasi</Label>
                 <Input type="number" value={newFilter.reorderLevel} onChange={(e) => setNewFilter({ ...newFilter, reorderLevel: e.target.value })} />
               </div>
             </div>
 
             <div className="flex gap-2">
               <Button type="submit" className="flex-1" disabled={isSaving}>
-                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saving...</> : (editingFilter ? 'Update' : 'Add')}
+                {isSaving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Saqlanmoqda...</> : (editingFilter ? 'Yangilash' : 'Qo\'shish')}
               </Button>
-              <Button type="button" variant="outline" onClick={() => setOpenFilterDialog(false)}>Cancel</Button>
+              <Button type="button" variant="outline" onClick={() => setOpenFilterDialog(false)}>Bekor qilish</Button>
             </div>
           </form>
         </DialogContent>

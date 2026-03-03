@@ -29,7 +29,7 @@ export function CustomerDebtCard({
     <Card className={hasOverdue ? 'border-orange-500' : hasDebt ? 'border-yellow-500' : 'border-green-500'}>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
         <CardTitle className="text-sm font-medium">Qarz holati</CardTitle>
-        <DollarSign className={`h-4 w-4 ${hasDebt ? 'text-orange-500' : 'text-green-500'}`} />
+        <DollarSign className={`h-4 w-4 ${hasDebt ? 'text-orange-600 dark:text-orange-500' : 'text-green-600 dark:text-green-500'}`} />
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -57,10 +57,10 @@ export function CustomerDebtCard({
 
             <div>
               <div className="flex items-center gap-2">
-                <Calendar className="h-4 w-4 text-orange-500" />
+                <Calendar className="h-4 w-4 text-orange-600 dark:text-orange-500" />
                 <span className="text-sm text-muted-foreground">Muddati o'tgan</span>
               </div>
-              <div className="text-lg font-semibold mt-1 text-orange-600">
+              <div className="text-lg font-semibold mt-1 text-orange-600 dark:text-orange-500">
                 {overdueServices}
               </div>
             </div>

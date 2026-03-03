@@ -4,6 +4,8 @@ export interface IEmployeeCommission {
   employee: mongoose.Types.ObjectId;
   commissionRate: number; // Percentage at time of service
   commissionAmount: number; // Calculated amount
+  commissionStatus: 'pending' | 'paid'; // Track if commission has been paid
+  paidAt?: Date; // When commission was paid
 }
 
 export interface IAdditionalProduct {
@@ -43,6 +45,9 @@ export interface IOilChangeDocument extends Document {
   nextServiceMileage: number;
   laborCost: number;
   price: number;
+  commissionRate: number; // Commission rate at time of service creation
+  status: 'active' | 'completed';
+  completedAt?: Date;
   // Payment tracking fields
   paymentStatus: 'paid' | 'partial' | 'unpaid';
   amountPaid: number;
@@ -72,6 +77,14 @@ const employeeCommissionSchema = new Schema({
     type: Number,
     required: true,
     min: 0
+  },
+  commissionStatus: {
+    type: String,
+    enum: ['pending', 'paid'],
+    default: 'pending'
+  },
+  paidAt: {
+    type: Date
   }
 }, { _id: false });
 
@@ -213,6 +226,22 @@ const oilChangeSchema = new Schema<IOilChangeDocument>(
       type: Number,
       required: [true, 'Price is required'],
       min: 0
+    },
+    commissionRate: {
+      type: Number,
+      required: true,
+      default: 30,
+      min: 0,
+      max: 100
+    },
+    status: {
+      type: String,
+      enum: ['active', 'completed'],
+      default: 'active',
+      index: true
+    },
+    completedAt: {
+      type: Date
     },
     // Payment tracking fields
     paymentStatus: {

@@ -53,6 +53,12 @@ export default function ServicePage() {
   const [servicesTotalPages, setServicesTotalPages] = useState(1)
   const [loadingServices, setLoadingServices] = useState(false)
   
+  // General services state
+  const [generalServices, setGeneralServices] = useState<any[]>([])
+  const [generalServicesPage, setGeneralServicesPage] = useState(1)
+  const [generalServicesTotalPages, setGeneralServicesTotalPages] = useState(1)
+  const [loadingGeneralServices, setLoadingGeneralServices] = useState(false)
+  
   // Vehicles state
   const [vehicles, setVehicles] = useState<Vehicle[]>([])
   const [vehiclesPage, setVehiclesPage] = useState(1)
@@ -71,6 +77,11 @@ export default function ServicePage() {
   useEffect(() => {
     loadRecentServices()
   }, [servicesPage])
+
+  // Load general services
+  useEffect(() => {
+    loadGeneralServices()
+  }, [generalServicesPage])
 
   // Load vehicles
   useEffect(() => {
@@ -158,22 +169,67 @@ export default function ServicePage() {
   const loadRecentServices = async () => {
     try {
       setLoadingServices(true)
-      const response = await api.get('/oil-changes', {
-        params: {
-          page: servicesPage,
-          limit: 10
-        }
-      })
       
-      // Filter out services without vehicle data
-      const validServices = (response.data.data || []).filter((s: OilChange) => s.vehicle)
-      setRecentServices(validServices)
-      setServicesTotalPages(response.data.totalPages || 1)
+      // Load both oil changes and general services
+      const [oilChangesRes, generalServicesRes] = await Promise.all([
+        api.get('/oil-changes', { params: { page: 1, limit: 50 } }),
+        api.get('/services', { params: { page: 1, limit: 50 } })
+      ])
+      
+      // Format oil changes
+      const oilChanges = (oilChangesRes.data.data || [])
+        .filter((s: any) => s.vehicle)
+        .map((s: any) => ({
+          ...s,
+          type: 'oilChange',
+          serviceName: 'Moy almashtirish'
+        }))
+      
+      // Format general services
+      const generalServices = (generalServicesRes.data.data || [])
+        .filter((s: any) => s.vehicle)
+        .map((s: any) => ({
+          ...s,
+          type: 'service',
+          serviceName: `Ish sessiyasi (${s.services?.length || 0} ta)`
+        }))
+      
+      // Merge and sort by date
+      const allServices = [...oilChanges, ...generalServices]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+      
+      // Paginate
+      const startIndex = (servicesPage - 1) * 10
+      const paginatedServices = allServices.slice(startIndex, startIndex + 10)
+      
+      setRecentServices(paginatedServices)
+      setServicesTotalPages(Math.ceil(allServices.length / 10))
     } catch (error) {
       console.error('Failed to load services:', error)
       setRecentServices([])
     } finally {
       setLoadingServices(false)
+    }
+  }
+
+  const loadGeneralServices = async () => {
+    try {
+      setLoadingGeneralServices(true)
+      const response = await api.get('/services', {
+        params: {
+          page: generalServicesPage,
+          limit: 10
+        }
+      })
+      
+      const validServices = (response.data.data || []).filter((s: any) => s.vehicle)
+      setGeneralServices(validServices)
+      setGeneralServicesTotalPages(response.data.totalPages || 1)
+    } catch (error) {
+      console.error('Failed to load general services:', error)
+      setGeneralServices([])
+    } finally {
+      setLoadingGeneralServices(false)
     }
   }
 
@@ -256,14 +312,14 @@ export default function ServicePage() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-foreground">Service Center</h1>
-        <p className="text-muted-foreground mt-1">Search vehicle and manage oil changes</p>
+        <h1 className="text-3xl font-bold text-foreground">Xizmat markazi</h1>
+        <p className="text-muted-foreground mt-1">Mashinani qidiring va xizmatlarni boshqaring</p>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Find Vehicle</CardTitle>
-          <CardDescription>Enter license plate number to get started</CardDescription>
+          <CardTitle>Mashinani topish</CardTitle>
+          <CardDescription>Boshlash uchun davlat raqamini kiriting</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex gap-2">
@@ -278,7 +334,7 @@ export default function ServicePage() {
                 maxLength={8}
               />
               <p className="text-xs text-muted-foreground mt-2 text-center">
-                {plateNumber.length}/8 characters
+                {plateNumber.length}/8 belgi
               </p>
             </div>
             <Button 
@@ -291,20 +347,20 @@ export default function ServicePage() {
               ) : (
                 <>
                   <Search className="w-5 h-5 mr-2" />
-                  Search
+                  Qidirish
                 </>
               )}
             </Button>
           </div>
 
           {searchResult === 'not-found' && (
-            <div className="mt-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-900 mb-3">
-                Vehicle <strong>{plateNumber}</strong> not found in database.
+            <div className="mt-4 p-4 bg-yellow-50 dark:bg-yellow-950/50 border-2 border-yellow-500 dark:border-yellow-500 rounded-lg">
+              <p className="text-sm text-yellow-900 dark:text-yellow-200 mb-3">
+                <strong>{plateNumber}</strong> raqamli mashina bazada topilmadi.
               </p>
               <Button onClick={handleAddVehicle} className="gap-2">
                 <Plus className="w-4 h-4" />
-                Add New Vehicle
+                Yangi mashina qo'shish
               </Button>
             </div>
           )}
@@ -313,8 +369,8 @@ export default function ServicePage() {
 
       <Tabs defaultValue="recent" className="space-y-4">
         <TabsList>
-          <TabsTrigger value="recent">Recent Services</TabsTrigger>
-          <TabsTrigger value="vehicles">All Vehicles</TabsTrigger>
+          <TabsTrigger value="recent">Barcha xizmatlar</TabsTrigger>
+          <TabsTrigger value="vehicles">Barcha mashinalar</TabsTrigger>
         </TabsList>
 
         <TabsContent value="recent">
@@ -322,9 +378,9 @@ export default function ServicePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Wrench className="w-5 h-5" />
-                Recent Oil Changes
+                Xizmatlar tarixi
               </CardTitle>
-              <CardDescription>Last 10 service records</CardDescription>
+              <CardDescription>Moy almashtirish va ish sessiyalari</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingServices ? (
@@ -333,72 +389,65 @@ export default function ServicePage() {
                 </div>
               ) : recentServices.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  No service records yet
+                  Hali xizmatlar yo'q
                 </p>
               ) : (
                 <>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Date</TableHead>
-                        <TableHead>Plate Number</TableHead>
-                        <TableHead>Vehicle</TableHead>
+                        <TableHead>Sana</TableHead>
+                        <TableHead>Raqam</TableHead>
+                        <TableHead>Mashina</TableHead>
+                        <TableHead>Xizmat</TableHead>
                         <TableHead>To'lov holati</TableHead>
-                        <TableHead className="text-right">Total Cost</TableHead>
+                        <TableHead className="text-right">Narx</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {recentServices.map((service) => (
-                        <TableRow key={service._id}>
+                      {recentServices.map((service: any) => (
+                        <TableRow key={service._id} className="cursor-pointer hover:bg-muted/50">
+                          <TableCell>{new Date(service.createdAt).toLocaleDateString()}</TableCell>
+                          <TableCell className="font-medium">{service.vehicle?.plateNumber}</TableCell>
+                          <TableCell>{service.vehicle?.brand} {service.vehicle?.vehicleModel}</TableCell>
                           <TableCell>
-                            {new Date(service.createdAt).toLocaleDateString('en-GB')}
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant="outline" className="font-mono">
-                              {service.vehicle?.plateNumber || 'N/A'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {service.vehicle?.brand || 'N/A'} {service.vehicle?.vehicleModel || ''}
-                          </TableCell>
-                          <TableCell>
-                            {service.paymentStatus === 'paid' ? (
-                              <Badge className="bg-green-600 hover:bg-green-700 text-white border-green-600">
-                                To'langan
-                              </Badge>
-                            ) : service.paymentStatus === 'partial' ? (
-                              <Badge variant="secondary">
-                                Qisman ({service.amountPaid?.toLocaleString()} / {service.price?.toLocaleString()})
+                            {service.type === 'oilChange' ? (
+                              <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/50 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
+                                Moy almashtirish
                               </Badge>
                             ) : (
-                              <Badge variant="destructive">
-                                To'lanmagan ({service.amountDue?.toLocaleString()} so'm)
+                              <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/50 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
+                                Ish sessiyasi ({service.services?.length || 0} ta)
                               </Badge>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {service.paymentStatus === 'paid' && <Badge className="bg-green-600 dark:bg-green-700">To'langan</Badge>}
+                            {service.paymentStatus === 'partial' && <Badge variant="secondary">Qisman</Badge>}
+                            {service.paymentStatus === 'unpaid' && <Badge variant="destructive">To'lanmagan</Badge>}
+                          </TableCell>
                           <TableCell className="text-right font-semibold">
-                            {(service.totalCost || 0).toLocaleString()} UZS
+                            {(service.price || service.totalPrice || 0).toLocaleString()} so'm
                           </TableCell>
                           <TableCell>
                             <Button
                               variant="ghost"
                               size="sm"
-                              onClick={() => loadServiceDetail(service._id)}
-                              disabled={loadingServiceDetail}
+                              onClick={() => router.push(`/dashboard/service/${service.vehicle._id}`)}
                             >
-                              {loadingServiceDetail ? <Loader2 className="w-4 h-4 animate-spin" /> : 'View'}
+                              Ko'rish
                             </Button>
                           </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
-                  
+
                   {servicesTotalPages > 1 && (
                     <div className="flex items-center justify-between mt-4">
                       <p className="text-sm text-muted-foreground">
-                        Page {servicesPage} of {servicesTotalPages}
+                        Sahifa {servicesPage} / {servicesTotalPages}
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -408,7 +457,6 @@ export default function ServicePage() {
                           disabled={servicesPage === 1}
                         >
                           <ChevronLeft className="w-4 h-4" />
-                          Previous
                         </Button>
                         <Button
                           variant="outline"
@@ -416,7 +464,6 @@ export default function ServicePage() {
                           onClick={() => setServicesPage(p => Math.min(servicesTotalPages, p + 1))}
                           disabled={servicesPage === servicesTotalPages}
                         >
-                          Next
                           <ChevronRight className="w-4 h-4" />
                         </Button>
                       </div>
@@ -433,9 +480,9 @@ export default function ServicePage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <Car className="w-5 h-5" />
-                Vehicle Database
+                Mashinalar bazasi
               </CardTitle>
-              <CardDescription>All registered vehicles</CardDescription>
+              <CardDescription>Barcha ro'yxatdan o'tgan mashinalar</CardDescription>
             </CardHeader>
             <CardContent>
               {loadingVehicles ? (
@@ -444,18 +491,18 @@ export default function ServicePage() {
                 </div>
               ) : vehicles.length === 0 ? (
                 <p className="text-muted-foreground text-center py-8">
-                  No vehicles registered yet
+                  Hali mashinalar ro'yxatdan o'tmagan
                 </p>
               ) : (
                 <>
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Plate Number</TableHead>
-                        <TableHead>Vehicle</TableHead>
-                        <TableHead>Engine Type</TableHead>
-                        <TableHead>Customer</TableHead>
-                        <TableHead>Phone</TableHead>
+                        <TableHead>Davlat raqami</TableHead>
+                        <TableHead>Mashina</TableHead>
+                        <TableHead>Dvigatel turi</TableHead>
+                        <TableHead>Mijoz</TableHead>
+                        <TableHead>Telefon</TableHead>
                         <TableHead>Qarz</TableHead>
                         <TableHead></TableHead>
                       </TableRow>
@@ -486,7 +533,7 @@ export default function ServicePage() {
                                 {vehicle.customer.totalDebt.toLocaleString()} so'm
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="text-green-600 border-green-600">
+                              <Badge variant="outline" className="text-green-600 dark:text-green-400 border-green-600 dark:border-green-500">
                                 To'langan
                               </Badge>
                             )}
@@ -497,7 +544,7 @@ export default function ServicePage() {
                               size="sm"
                               onClick={() => router.push(`/dashboard/service/${vehicle._id}`)}
                             >
-                              Service
+                              Xizmat
                             </Button>
                           </TableCell>
                         </TableRow>
@@ -508,7 +555,7 @@ export default function ServicePage() {
                   {vehiclesTotalPages > 1 && (
                     <div className="flex items-center justify-between mt-4">
                       <p className="text-sm text-muted-foreground">
-                        Page {vehiclesPage} of {vehiclesTotalPages}
+                        Sahifa {vehiclesPage} / {vehiclesTotalPages}
                       </p>
                       <div className="flex gap-2">
                         <Button
@@ -518,7 +565,7 @@ export default function ServicePage() {
                           disabled={vehiclesPage === 1}
                         >
                           <ChevronLeft className="w-4 h-4" />
-                          Previous
+                          Oldingi
                         </Button>
                         <Button
                           variant="outline"
@@ -526,7 +573,7 @@ export default function ServicePage() {
                           onClick={() => setVehiclesPage(p => Math.min(vehiclesTotalPages, p + 1))}
                           disabled={vehiclesPage === vehiclesTotalPages}
                         >
-                          Next
+                          Keyingi
                           <ChevronRight className="w-4 h-4" />
                         </Button>
                       </div>
@@ -720,10 +767,10 @@ export default function ServicePage() {
                         <Badge 
                           className={
                             entry.action === 'created' 
-                              ? 'bg-green-100 text-green-900 border-green-200'
+                              ? 'bg-green-100 dark:bg-green-900/50 text-green-900 dark:text-green-200 border-green-200 dark:border-green-700'
                               : entry.action === 'updated'
-                              ? 'bg-blue-100 text-blue-900 border-blue-200'
-                              : 'bg-orange-100 text-orange-900 border-orange-200'
+                              ? 'bg-blue-100 dark:bg-blue-900/50 text-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-700'
+                              : 'bg-orange-100 dark:bg-orange-900/50 text-orange-900 dark:text-orange-200 border-orange-200 dark:border-orange-700'
                           }
                         >
                           {entry.action === 'created' ? 'Yaratildi' : entry.action === 'updated' ? 'O\'zgartirildi' : 'Arxivlandi'}
@@ -763,7 +810,7 @@ export default function ServicePage() {
                           <div className="grid grid-cols-2 gap-3">
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Eski qiymat:</p>
-                              <div className="bg-red-50 border border-red-200 rounded p-2">
+                              <div className="bg-red-50 dark:bg-red-950/50 border border-red-200 dark:border-red-800 rounded p-2">
                                 <p className="text-xs text-foreground font-mono break-all">
                                   {change.oldValue === null || change.oldValue === undefined 
                                     ? '(bo\'sh)' 
@@ -775,7 +822,7 @@ export default function ServicePage() {
                             </div>
                             <div>
                               <p className="text-xs text-muted-foreground mb-1">Yangi qiymat:</p>
-                              <div className="bg-green-50 border border-green-200 rounded p-2">
+                              <div className="bg-green-50 dark:bg-green-950/50 border border-green-200 dark:border-green-800 rounded p-2">
                                 <p className="text-xs text-foreground font-mono break-all">
                                   {change.newValue === null || change.newValue === undefined 
                                     ? '(bo\'sh)' 

@@ -6,6 +6,10 @@ import { UserRole } from '../types';
 const router = Router();
 const oilChangeController = new OilChangeController();
 
+// Public routes (no authentication required)
+router.get('/:id/public', oilChangeController.getOilChangeByIdPublic.bind(oilChangeController));
+
+// Protected routes
 router.get('/archived', authenticate, oilChangeController.getArchivedOilChanges.bind(oilChangeController));
 router.get('/today-count', authenticate, oilChangeController.getTodayCount.bind(oilChangeController));
 router.get('/monthly-revenue', authenticate, oilChangeController.getMonthlyRevenue.bind(oilChangeController));
@@ -18,5 +22,6 @@ router.post('/', authenticate, oilChangeController.createOilChange.bind(oilChang
 router.put('/:id', authenticate, oilChangeController.updateOilChange.bind(oilChangeController));
 router.post('/:id/archive', authenticate, oilChangeController.archiveOilChange.bind(oilChangeController));
 router.post('/:id/restore', authenticate, oilChangeController.restoreOilChange.bind(oilChangeController));
+router.post('/:id/complete', authenticate, oilChangeController.completeOilChange.bind(oilChangeController));
 
 export default router;

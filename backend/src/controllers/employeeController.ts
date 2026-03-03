@@ -115,4 +115,46 @@ export class EmployeeController {
       next(error);
     }
   }
+
+  async getEmployeeStatistics(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const statistics = await employeeService.getEmployeeStatistics(tenantId, req.params.id);
+      res.status(200).json(ApiResponse.success('Employee statistics retrieved', statistics));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getEmployeeServices(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const { startDate, endDate, serviceType, paymentStatus, page, limit } = req.query;
+
+      const filters: any = {
+        page: page ? parseInt(page as string) : 1,
+        limit: limit ? parseInt(limit as string) : 20
+      };
+
+      if (startDate) filters.startDate = new Date(startDate as string);
+      if (endDate) filters.endDate = new Date(endDate as string);
+      if (serviceType) filters.serviceType = serviceType;
+      if (paymentStatus) filters.paymentStatus = paymentStatus;
+
+      const result = await employeeService.getEmployeeServices(tenantId, req.params.id, filters);
+      res.status(200).json(ApiResponse.success('Employee services retrieved', result));
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  async getTotalEmployeeDebt(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const result = await employeeService.getTotalEmployeeDebt(tenantId);
+      res.status(200).json(ApiResponse.success('Total employee debt retrieved', result));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

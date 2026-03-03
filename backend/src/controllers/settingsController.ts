@@ -82,4 +82,13 @@ export class SettingsController {
       next(error);
     }
   }
+
+  async getPublicSettings(req: any, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const settings = await settingsService.getPublicSettings();
+      res.status(200).json(ApiResponse.success('Public settings retrieved', settings));
+    } catch (error) {
+      next(error);
+    }
+  }
 }
