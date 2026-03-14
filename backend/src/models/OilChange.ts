@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 export interface IEmployeeCommission {
   employee: mongoose.Types.ObjectId;
@@ -16,6 +17,7 @@ export interface IAdditionalProduct {
 
 export interface IOilChangeDocument extends Document {
   tenant: mongoose.Types.ObjectId;
+  publicUuid: string; // Public UUID for QR codes
   vehicle: mongoose.Types.ObjectId;
   customer: mongoose.Types.ObjectId;
   employees: mongoose.Types.ObjectId[];
@@ -112,6 +114,12 @@ const oilChangeSchema = new Schema<IOilChangeDocument>(
       type: Schema.Types.ObjectId,
       ref: 'Tenant',
       required: [true, 'Tenant is required'],
+      index: true
+    },
+    publicUuid: {
+      type: String,
+      unique: true,
+      default: uuidv4,
       index: true
     },
     vehicle: {

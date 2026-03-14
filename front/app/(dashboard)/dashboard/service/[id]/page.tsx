@@ -21,7 +21,7 @@ import { PaymentRecordingDialog } from '@/components/PaymentRecordingDialog'
 import { AddServiceDialog } from '@/components/AddServiceDialog'
 import { UnifiedServiceHistory } from '@/components/UnifiedServiceHistory'
 import { EditServiceDialog } from '@/components/EditServiceDialog'
-import QRCode from 'qrcode'
+import { EmployeeCommissionControl } from '@/components/EmployeeCommissionControl'
 
 
 export default function VehicleDetailPage() {
@@ -50,6 +50,7 @@ export default function VehicleDetailPage() {
   const [historyData, setHistoryData] = useState<any[]>([])
   const [loadingHistory, setLoadingHistory] = useState(false)
   const [editEngineType, setEditEngineType] = useState('')
+  const [employeeCommissions, setEmployeeCommissions] = useState<any[]>([])
   const [showEditService, setShowEditService] = useState(false)
   const [editingService, setEditingService] = useState<any>(null)
   const [editServiceOilProductId, setEditServiceOilProductId] = useState('')
@@ -62,6 +63,7 @@ export default function VehicleDetailPage() {
   const [editServiceOilFilterCustomerProvided, setEditServiceOilFilterCustomerProvided] = useState(false)
   const [editServiceAirFilterCustomerProvided, setEditServiceAirFilterCustomerProvided] = useState(false)
   const [editServiceCabinFilterCustomerProvided, setEditServiceCabinFilterCustomerProvided] = useState(false)
+  const [editServiceLaborCost, setEditServiceLaborCost] = useState(0)
   const [editServiceFuelFilterCustomerProvided, setEditServiceFuelFilterCustomerProvided] = useState(false)
 
   // Customer debt state
@@ -133,6 +135,28 @@ export default function VehicleDetailPage() {
     fetchCompanySettings()
   }, [params.id])
 
+  // Reset employee commissions when editing service employees change
+  useEffect(() => {
+    if (editingService && editServiceEmployeeIds.length > 0) {
+      // Initialize commissions for selected employees
+      const selectedEmployees = employees.filter(emp => editServiceEmployeeIds.includes(emp._id))
+      const existingCommissions = editingService.employeeCommissions || []
+      
+      const initialCommissions = selectedEmployees.map(emp => {
+        const existing = existingCommissions.find((c: any) => c.employee === emp._id || c.employee._id === emp._id)
+        return {
+          employee: emp._id,
+          commissionRate: existing?.commissionRate || emp.commissionRate,
+          commissionAmount: existing?.commissionAmount || ((editingService.laborCost || 0) * (existing?.commissionRate || emp.commissionRate) / 100)
+        }
+      })
+      
+      setEmployeeCommissions(initialCommissions)
+    } else {
+      setEmployeeCommissions([])
+    }
+  }, [editServiceEmployeeIds, editingService, employees])
+
   const fetchVehicleData = async () => {
     try {
       setIsLoading(true)
@@ -163,9 +187,10 @@ export default function VehicleDetailPage() {
   const fetchCompanySettings = async () => {
     try {
       const response = await api.get('/settings')
-      setCompanySettings(response.data.data)
+      setCompanySettings(response.data?.data || response.data || {})
     } catch (error) {
       console.error('Failed to load company settings:', error)
+      setCompanySettings({}) // Set empty object as fallback
     }
   }
 
@@ -198,6 +223,47 @@ export default function VehicleDetailPage() {
     } finally {
       setLoadingPaymentHistory(false)
     }
+  }
+
+  const calculateTotalPrice = () => {
+    let total = Number(formData.laborCost) || 0
+    
+    // Add oil product price
+    if (!formData.oilProductCustomerProvided && formData.oilProductId) {
+      const oilProduct = oilProducts.find(p => p._id === formData.oilProductId)
+      if (oilProduct) {
+        total += (oilProduct.price || 0) * (Number(formData.oilQuantityUsed) || 1)
+      }
+    }
+    
+    // Add filter prices
+    if (!formData.oilFilterCustomerProvided && formData.oilFilterId) {
+      const filter = oilFilters.find(f => f._id === formData.oilFilterId)
+      if (filter) total += filter.price || 0
+    }
+    
+    if (!formData.airFilterCustomerProvided && formData.airFilterId) {
+      const filter = airFilters.find(f => f._id === formData.airFilterId)
+      if (filter) total += filter.price || 0
+    }
+    
+    if (!formData.cabinFilterCustomerProvided && formData.cabinFilterId) {
+      const filter = cabinFilters.find(f => f._id === formData.cabinFilterId)
+      if (filter) total += filter.price || 0
+    }
+    
+    if (!formData.fuelFilterCustomerProvided && formData.fuelFilterId) {
+      const filter = fuelFilters.find(f => f._id === formData.fuelFilterId)
+      if (filter) total += filter.price || 0
+    }
+    
+    // Add additional products
+    formData.additionalProducts.forEach(productId => {
+      const product = additionalProducts.find(p => p._id === productId)
+      if (product) total += product.price || 0
+    })
+    
+    return total
   }
 
   // Lazy load payment history when dropdown opens
@@ -395,16 +461,22 @@ export default function VehicleDetailPage() {
       }
       
       // Generate QR code
-      const publicUrl = `${window.location.origin}/service/${serviceId}`
-      const qrDataUrl = await QRCode.toDataURL(publicUrl, {
-        width: 80,
-        margin: 1,
-        color: {
-          dark: '#000000',
-          light: '#FFFFFF'
-        }
-      })
-      setQrCodeDataUrl(qrDataUrl)
+      const publicUrl = `${window.location.origin}/public/service/${serviceData.publicUuid || serviceId}`
+      try {
+        const QRCodeModule = await import('qrcode') as any
+        const qrDataUrl = await QRCodeModule.default.toDataURL(publicUrl, {
+          width: 80,
+          margin: 1,
+          color: {
+            dark: '#000000',
+            light: '#FFFFFF'
+          }
+        })
+        setQrCodeDataUrl(qrDataUrl)
+      } catch (qrError) {
+        console.error('QR Code generation failed:', qrError)
+        setQrCodeDataUrl('')
+      }
       
       setLastServiceData(serviceData)
       setShowPrintPreview(true) // Show modal to choose format
@@ -440,8 +512,14 @@ export default function VehicleDetailPage() {
     if (type === 'oilChange') {
       // Fetch oil change data from API and open edit dialog
       try {
-        const response = await api.get(`/oil-changes/${serviceId}`)
+        const response = await api.get(`/oil-changes/${serviceId}?t=${Date.now()}`)
         const service = response.data.data
+        console.log('Fetched service from API for edit:', service)
+        console.log('Service employeeCommissions from API:', service.employeeCommissions)
+        
+        // Show fetched commission data in alert for debugging
+        alert(`API'dan olingan komissiya ma'lumotlari:\n${JSON.stringify(service.employeeCommissions, null, 2)}`)
+        
         handleEditService(service)
       } catch (error) {
         alert('Xizmatni yuklashda xatolik yuz berdi')
@@ -454,16 +532,16 @@ export default function VehicleDetailPage() {
   }
 
   const handleDeleteService = async (serviceId: string) => {
-    if (!confirm('Are you sure you want to delete this service? It will be moved to archive.')) return
+    if (!confirm('Ushbu xizmatni o\'chirmoqchimisiz? U arxivga ko\'chiriladi.')) return
 
     try {
       await api.post(`/oil-changes/${serviceId}/archive`, {
         reason: 'Deleted from vehicle detail page'
       })
-      alert('Service deleted successfully')
+      alert('Xizmat muvaffaqiyatli o\'chirildi')
       fetchVehicleData() // Reload data
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to delete service')
+      alert(error.response?.data?.message || 'Xizmatni o\'chirishda xatolik yuz berdi')
     }
   }
 
@@ -486,6 +564,16 @@ export default function VehicleDetailPage() {
     setEditServiceFuelFilterId(service.fuelFilter?._id || 'none')
     setEditServiceFuelFilterCustomerProvided(service.fuelFilterCustomerProvided || false)
     setEditServiceEmployeeIds(service.employees?.map((e: any) => e._id) || [])
+    
+    // Initialize labor cost state
+    setEditServiceLaborCost(service.laborCost || 0)
+    
+    // Load existing employee commissions
+    setEmployeeCommissions(service.employeeCommissions || [])
+    
+    console.log('Loading service for edit:', service)
+    console.log('Existing employee commissions:', service.employeeCommissions)
+    
     setShowEditService(true)
   }
 
@@ -499,14 +587,14 @@ export default function VehicleDetailPage() {
       const oilQuantityUsed = (document.getElementById('edit-oil-quantity') as HTMLInputElement)?.value
 
       if (!mileage || !nextServiceMileage) {
-        alert('Please fill all required fields')
+        alert('Barcha majburiy maydonlarni to\'ldiring')
         return
       }
 
       const updateData: any = {
         mileage: Number(mileage),
         nextServiceMileage: Number(nextServiceMileage),
-        laborCost: Number(laborCost) || 0,
+        laborCost: editServiceLaborCost,
         oilQuantityUsed: Number(oilQuantityUsed) || editingService.oilQuantityUsed
       }
 
@@ -588,14 +676,29 @@ export default function VehicleDetailPage() {
         updateData.employeeIds = editServiceEmployeeIds
       }
 
-      await api.put(`/oil-changes/${editingService._id}`, updateData)
+      // Add employee commissions - always send current commissions
+      updateData.employeeCommissions = employeeCommissions
+      
+      console.log('Updating service with data:', updateData)
+      console.log('Employee commissions being sent:', employeeCommissions)
+      
+      // Show commission data in alert for debugging
+      alert(`Komissiya ma'lumotlari yuborilmoqda:\n${JSON.stringify(employeeCommissions, null, 2)}`)
 
-      alert('Service updated successfully')
+      const response = await api.put(`/oil-changes/${editingService._id}`, updateData)
+      console.log('API response:', response.data)
+      
+      // Show API response in alert
+      alert(`API javobi:\n${JSON.stringify(response.data, null, 2)}`)
+
+      alert('Xizmat muvaffaqiyatli yangilandi')
       setShowEditService(false)
       setEditingService(null)
+      setEditServiceLaborCost(0)
+      setEmployeeCommissions([]) // Reset commissions after successful update
       fetchVehicleData() // Reload data
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update service')
+      alert(error.response?.data?.message || 'Xizmatni yangilashda xatolik yuz berdi')
     }
   }
 
@@ -606,7 +709,7 @@ export default function VehicleDetailPage() {
       const engineType = editEngineType || data?.vehicle?.engineType
 
       if (!brand || !vehicleModel || !engineType) {
-        alert('Please fill all fields')
+        alert('Barcha maydonlarni to\'ldiring')
         return
       }
 
@@ -616,11 +719,11 @@ export default function VehicleDetailPage() {
         engineType
       })
 
-      alert('Vehicle updated successfully')
+      alert('Mashina muvaffaqiyatli yangilandi')
       setShowEditVehicle(false)
       fetchVehicleData() // Reload data
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to update vehicle')
+      alert(error.response?.data?.message || 'Mashinani yangilashda xatolik yuz berdi')
     }
   }
 
@@ -754,6 +857,7 @@ export default function VehicleDetailPage() {
         vehicleId: params.id,
         customerId: data.vehicle.customer._id,
         employeeIds: formData.employeeIds,
+        employeeCommissions: employeeCommissions,
         oilProductId: formData.oilProductCustomerProvided ? undefined : formData.oilProductId,
         oilProductCustomerProvided: formData.oilProductCustomerProvided,
         oilProductCustomerProvidedDetails: formData.oilProductCustomerProvided ? formData.oilProductCustomerProvidedDetails : undefined,
@@ -765,10 +869,10 @@ export default function VehicleDetailPage() {
         mileage: Number(formData.mileage),
         nextServiceMileage: Number(formData.nextServiceMileage),
         laborCost: Number(formData.laborCost) || 0,
-        price: calculatePrice(),
+        price: calculateTotalPrice(),
         // Payment fields
         paymentStatus: formData.paymentStatus,
-        amountPaid: formData.paymentStatus === 'paid' ? calculatePrice() : 
+        amountPaid: formData.paymentStatus === 'paid' ? calculateTotalPrice() : 
                     formData.paymentStatus === 'partial' ? Number(formData.amountPaid) : 0,
         dueDate: formData.dueDate
       }
@@ -844,6 +948,7 @@ export default function VehicleDetailPage() {
         amountPaid: '',
         dueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
       })
+      setEmployeeCommissions([])
       setShowMoreFilters(false)
       setShowAdditionalProducts(false)
       setShowOilChangeDialog(false)
@@ -856,29 +961,58 @@ export default function VehicleDetailPage() {
     }
   }
 
-  // DUPLICATE REMOVED - handlePrint is already defined earlier in the file
-
-  const handlePrintService = (service: any) => {
-    setLastServiceData({
-      vehicleId: service.vehicle,
-      customerId: service.customer,
-      employeeId: service.employee?._id,
-      oilProductId: service.oilProduct?._id,
-      oilFilterId: service.oilFilter?._id,
-      additionalProducts: service.additionalProducts || [],
-      mileage: service.mileage,
-      nextServiceMileage: service.nextServiceMileage,
-      laborCost: service.laborCost || 0,
-      price: service.price,
-      date: new Date(service.createdAt),
-      filterName: service.oilFilter?.name,
-      oilProductName: service.oilProduct?.displayName || `${service.oilProduct?.brand} ${service.oilProduct?.viscosity} ${service.oilProduct?.apiGrade} ${service.oilProduct?.volume}L`
-    })
-    setPrintType('sticker')
-    setShowPrintPreview(true)
+  const handlePrintService = async (service: any) => {
+    try {
+      console.log('Printing service:', service._id)
+      
+      // Load full service data for printing with cache busting
+      const response = await api.get(`/services/${service._id}?t=${Date.now()}`)
+      console.log('Service data loaded:', response.data)
+      
+      const serviceData = response.data.data
+      
+      setLastServiceData({
+        ...serviceData,
+        createdAt: serviceData.createdAt,
+        price: serviceData.totalPrice || serviceData.price,
+        mileage: serviceData.mileage,
+        nextServiceMileage: serviceData.nextServiceMileage,
+        oilProduct: serviceData.oilProduct,
+        oilFilter: serviceData.oilFilter,
+        airFilter: serviceData.airFilter,
+        cabinFilter: serviceData.cabinFilter,
+        fuelFilter: serviceData.fuelFilter,
+        employees: serviceData.employees,
+        oilQuantityUsed: serviceData.oilQuantityUsed
+      })
+      
+      setPrintType('receipt')
+      setShowPrintPreview(true)
+      
+    } catch (error: any) {
+      console.error('Print service error:', error)
+      console.error('Error response:', error.response?.data)
+      
+      if (error.response?.status === 304) {
+        // Handle 304 Not Modified - try to use cached data
+        console.log('Using service data from props:', service)
+        setLastServiceData({
+          ...service,
+          createdAt: service.createdAt,
+          price: service.totalPrice || service.price,
+          mileage: service.mileage,
+          nextServiceMileage: service.nextServiceMileage,
+          employees: service.employees || []
+        })
+        setPrintType('receipt')
+        setShowPrintPreview(true)
+      } else {
+        alert(`Xizmatni yuklashda xatolik yuz berdi: ${error.response?.data?.message || error.message}`)
+      }
+    }
   }
 
-  // DUPLICATE REMOVED - handlePrintA4 is already defined earlier in the file
+  // DUPLICATE REMOVED - handlePrint is already defined earlier in the file
 
   if (isLoading) {
     return (
@@ -991,7 +1125,7 @@ export default function VehicleDetailPage() {
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Oxirgi xizmat</p>
             <p className="text-lg font-semibold text-foreground mt-2">
-              {lastService ? new Date(lastService.createdAt).toLocaleDateString() : 'Hech qachon'}
+              {lastService ? new Date((lastService as any).createdAt).toLocaleDateString() : 'Hech qachon'}
             </p>
           </CardContent>
         </Card>
@@ -1286,16 +1420,16 @@ export default function VehicleDetailPage() {
       <Dialog open={showEditService} onOpenChange={setShowEditService}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Edit Service</DialogTitle>
+            <DialogTitle>Xizmatni tahrirlash</DialogTitle>
             <DialogDescription>
-              Update service information - Vehicle: {vehicle.plateNumber}
+              Xizmat ma'lumotlarini yangilash - Mashina: {vehicle.plateNumber}
             </DialogDescription>
           </DialogHeader>
           {editingService && (
             <div className="space-y-6">
               {/* Oil Product */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-foreground mb-3">Oil Product</h3>
+                <h3 className="font-semibold text-foreground mb-3">Moy mahsuloti</h3>
                 <div className="space-y-3">
                   <div className="flex items-center gap-2">
                     <Checkbox
@@ -1309,34 +1443,34 @@ export default function VehicleDetailPage() {
                       }}
                     />
                     <Label htmlFor="edit-oilProductCustomerProvided" className="cursor-pointer">
-                      Customer provided their own oil
+                      Mijoz o'z moyini olib keldi
                     </Label>
                   </div>
 
                   {editServiceOilProductCustomerProvided ? (
                     <div>
-                      <Label>Oil Details</Label>
+                      <Label>Moy ma'lumotlari</Label>
                       <Input
                         id="edit-oil-product-details"
-                        placeholder="e.g., Mobil 5W-30 SN 4L"
+                        placeholder="Masalan: Mobil 5W-30 SN 4L"
                         defaultValue={editingService.oilProductCustomerProvidedDetails || ''}
                       />
                     </div>
                   ) : (
                     <div>
-                      <Label>Select Oil Product</Label>
+                      <Label>Moy mahsulotini tanlang</Label>
                       <Select 
                         value={editServiceOilProductId}
                         onValueChange={setEditServiceOilProductId}
                       >
                         <SelectTrigger>
-                          <SelectValue placeholder="Select oil product" />
+                          <SelectValue placeholder="Moy mahsulotini tanlang" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="none">Yo'q</SelectItem>
                           {oilProducts.map((product) => (
                             <SelectItem key={product._id} value={product._id}>
-                              {product.displayName} (Stock: {product.stock})
+                              {product.displayName} (Ombor: {product.stock})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1345,7 +1479,7 @@ export default function VehicleDetailPage() {
                   )}
 
                   <div>
-                    <Label>Quantity Used (L)</Label>
+                    <Label>Ishlatilgan miqdor (L)</Label>
                     <Input
                       id="edit-oil-quantity"
                       type="number"
@@ -1358,7 +1492,7 @@ export default function VehicleDetailPage() {
 
               {/* Filters */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-foreground mb-3">Filters</h3>
+                <h3 className="font-semibold text-foreground mb-3">Filterlar</h3>
                 <div className="space-y-4">
                   {/* Oil Filter */}
                   <div>
@@ -1374,13 +1508,13 @@ export default function VehicleDetailPage() {
                         }}
                       />
                       <Label htmlFor="edit-oilFilterCustomerProvided" className="cursor-pointer text-xs">
-                        Customer provided oil filter
+                        Mijoz moy filterini olib keldi
                       </Label>
                     </div>
                     {editServiceOilFilterCustomerProvided ? (
                       <Input
                         id="edit-oil-filter-details"
-                        placeholder="Oil filter details"
+                        placeholder="Moy filteri ma'lumotlari"
                         defaultValue={editingService.oilFilterCustomerProvidedDetails || ''}
                         className="text-sm"
                       />
@@ -1390,13 +1524,13 @@ export default function VehicleDetailPage() {
                         onValueChange={setEditServiceOilFilterId}
                       >
                         <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Select oil filter" />
+                          <SelectValue placeholder="Moy filterini tanlang" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="none">Yo'q</SelectItem>
                           {oilFilters.map((filter) => (
                             <SelectItem key={filter._id} value={filter._id}>
-                              {filter.brandName || filter.brand} {filter.partNumber} (Stock: {filter.stock})
+                              {filter.brandName || filter.brand} {filter.partNumber} (Ombor: {filter.stock})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1418,13 +1552,13 @@ export default function VehicleDetailPage() {
                         }}
                       />
                       <Label htmlFor="edit-airFilterCustomerProvided" className="cursor-pointer text-xs">
-                        Customer provided air filter
+                        Mijoz havo filterini olib keldi
                       </Label>
                     </div>
                     {editServiceAirFilterCustomerProvided ? (
                       <Input
                         id="edit-air-filter-details"
-                        placeholder="Air filter details"
+                        placeholder="Havo filteri ma'lumotlari"
                         defaultValue={editingService.airFilterCustomerProvidedDetails || ''}
                         className="text-sm"
                       />
@@ -1434,13 +1568,13 @@ export default function VehicleDetailPage() {
                         onValueChange={setEditServiceAirFilterId}
                       >
                         <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Select air filter" />
+                          <SelectValue placeholder="Havo filterini tanlang" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="none">Yo'q</SelectItem>
                           {airFilters.map((filter) => (
                             <SelectItem key={filter._id} value={filter._id}>
-                              {filter.brandName || filter.brand} {filter.partNumber} (Stock: {filter.stock})
+                              {filter.brandName || filter.brand} {filter.partNumber} (Ombor: {filter.stock})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1462,13 +1596,13 @@ export default function VehicleDetailPage() {
                         }}
                       />
                       <Label htmlFor="edit-cabinFilterCustomerProvided" className="cursor-pointer text-xs">
-                        Customer provided cabin filter
+                        Mijoz salon filterini olib keldi
                       </Label>
                     </div>
                     {editServiceCabinFilterCustomerProvided ? (
                       <Input
                         id="edit-cabin-filter-details"
-                        placeholder="Cabin filter details"
+                        placeholder="Salon filteri ma'lumotlari"
                         defaultValue={editingService.cabinFilterCustomerProvidedDetails || ''}
                         className="text-sm"
                       />
@@ -1478,13 +1612,13 @@ export default function VehicleDetailPage() {
                         onValueChange={setEditServiceCabinFilterId}
                       >
                         <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Select cabin filter" />
+                          <SelectValue placeholder="Salon filterini tanlang" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="none">Yo'q</SelectItem>
                           {cabinFilters.map((filter) => (
                             <SelectItem key={filter._id} value={filter._id}>
-                              {filter.brandName || filter.brand} {filter.partNumber} (Stock: {filter.stock})
+                              {filter.brandName || filter.brand} {filter.partNumber} (Ombor: {filter.stock})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1506,13 +1640,13 @@ export default function VehicleDetailPage() {
                         }}
                       />
                       <Label htmlFor="edit-fuelFilterCustomerProvided" className="cursor-pointer text-xs">
-                        Customer provided fuel filter
+                        Mijoz yoqilg'i filterini olib keldi
                       </Label>
                     </div>
                     {editServiceFuelFilterCustomerProvided ? (
                       <Input
                         id="edit-fuel-filter-details"
-                        placeholder="Fuel filter details"
+                        placeholder="Yoqilg'i filteri ma'lumotlari"
                         defaultValue={editingService.fuelFilterCustomerProvidedDetails || ''}
                         className="text-sm"
                       />
@@ -1522,13 +1656,13 @@ export default function VehicleDetailPage() {
                         onValueChange={setEditServiceFuelFilterId}
                       >
                         <SelectTrigger className="text-sm">
-                          <SelectValue placeholder="Select fuel filter" />
+                          <SelectValue placeholder="Yoqilg'i filterini tanlang" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="none">Yo'q</SelectItem>
                           {fuelFilters.map((filter) => (
                             <SelectItem key={filter._id} value={filter._id}>
-                              {filter.brandName || filter.brand} {filter.partNumber} (Stock: {filter.stock})
+                              {filter.brandName || filter.brand} {filter.partNumber} (Ombor: {filter.stock})
                             </SelectItem>
                           ))}
                         </SelectContent>
@@ -1540,7 +1674,7 @@ export default function VehicleDetailPage() {
 
               {/* Employees */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-foreground mb-3">Employees</h3>
+                <h3 className="font-semibold text-foreground mb-3">Xodimlar</h3>
                 <div className="space-y-2">
                   {employees.map((emp) => (
                     <div key={emp._id} className="flex items-center gap-2">
@@ -1558,36 +1692,52 @@ export default function VehicleDetailPage() {
                         className="w-4 h-4"
                       />
                       <label htmlFor={`emp-${emp._id}`} className="text-sm cursor-pointer">
-                        {emp.name} - Commission: {emp.commissionRate}%
+                        {emp.name} - Komissiya: {emp.commissionRate}%
                       </label>
                     </div>
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground mt-2">
-                  Note: Changing employees will recalculate commissions based on labor cost.
+                  Eslatma: Xodimlarni o'zgartirish komissiyani ish haqi asosida qayta hisoblaydi.
                 </p>
+
+                {/* Employee Commission Control */}
+                {editServiceEmployeeIds.length > 0 && (
+                  <div className="mt-4">
+                    <EmployeeCommissionControl
+                      employees={employees}
+                      selectedEmployees={editServiceEmployeeIds}
+                      totalServicePrice={editServiceLaborCost}
+                      commissions={employeeCommissions}
+                      onCommissionsChange={(commissions) => {
+                        console.log('Commission changed in parent:', commissions)
+                        setEmployeeCommissions(commissions)
+                      }}
+                    />
+                  </div>
+                )}
               </div>
 
               {/* Mileage & Service Info */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-foreground mb-3">Mileage & Service Info</h3>
+                <h3 className="font-semibold text-foreground mb-3">Probeg va Xizmat ma'lumotlari</h3>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <Label htmlFor="edit-service-mileage">Current Mileage (km) *</Label>
+                    <Label htmlFor="edit-service-mileage">Hozirgi probeg (km) *</Label>
                     <Input
                       id="edit-service-mileage"
                       type="number"
                       defaultValue={editingService.mileage}
-                      placeholder="e.g., 50000"
+                      placeholder="Masalan: 50000"
                     />
                   </div>
                   <div>
-                    <Label htmlFor="edit-service-next-mileage">Next Service Mileage (km) *</Label>
+                    <Label htmlFor="edit-service-next-mileage">Keyingi xizmat probegi (km) *</Label>
                     <Input
                       id="edit-service-next-mileage"
                       type="number"
                       defaultValue={editingService.nextServiceMileage}
-                      placeholder="e.g., 55000"
+                      placeholder="Masalan: 55000"
                     />
                   </div>
                 </div>
@@ -1595,29 +1745,33 @@ export default function VehicleDetailPage() {
 
               {/* Pricing */}
               <div className="border-b pb-4">
-                <h3 className="font-semibold text-foreground mb-3">Pricing</h3>
+                <h3 className="font-semibold text-foreground mb-3">Narxlash</h3>
                 <div className="space-y-3">
                   <div>
-                    <Label htmlFor="edit-service-labor">Labor Cost (so'm)</Label>
+                    <Label htmlFor="edit-service-labor">Ish haqi (so'm)</Label>
                     <Input
                       id="edit-service-labor"
                       type="number"
-                      defaultValue={editingService.laborCost || 0}
-                      placeholder="e.g., 50000"
+                      value={editServiceLaborCost}
+                      placeholder="Masalan: 50000"
+                      onChange={(e) => {
+                        const newLaborCost = Number(e.target.value) || 0
+                        setEditServiceLaborCost(newLaborCost)
+                      }}
                     />
                     <p className="text-xs text-muted-foreground mt-1">
-                      Used for employee commission calculation
+                      Xodim komissiyasini hisoblash uchun ishlatiladi
                     </p>
                   </div>
                   <div className="bg-muted/30 p-4 rounded-lg">
                     <div className="flex items-center justify-between">
-                      <span className="text-sm font-medium text-muted-foreground">Total Price:</span>
+                      <span className="text-sm font-medium text-muted-foreground">Jami narx:</span>
                       <span className="text-2xl font-bold text-primary">
                         {(editingService.price || 0).toLocaleString()} so'm
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
-                      Calculated automatically from products and labor cost
+                      Mahsulotlar va ish haqi asosida avtomatik hisoblanadi
                     </p>
                   </div>
                 </div>
@@ -1626,26 +1780,26 @@ export default function VehicleDetailPage() {
               {/* Additional Products */}
               {editingService.additionalProducts && editingService.additionalProducts.length > 0 && (
                 <div className="border-b pb-4">
-                  <h3 className="font-semibold text-foreground mb-3">Additional Products</h3>
+                  <h3 className="font-semibold text-foreground mb-3">Qo'shimcha mahsulotlar</h3>
                   <div className="space-y-2">
                     {editingService.additionalProducts.map((prod: any, idx: number) => (
                       <div key={idx} className="flex items-center justify-between text-sm bg-muted/30 p-2 rounded">
-                        <span>{prod.product?.name || 'Unknown'}</span>
-                        <span>Qty: {prod.quantity} × ${prod.price}</span>
+                        <span>{prod.product?.name || 'Noma\'lum'}</span>
+                        <span>Miqdor: {prod.quantity} × {prod.price} so'm</span>
                       </div>
                     ))}
                   </div>
                   <p className="text-xs text-muted-foreground mt-2">
-                    Note: Additional products cannot be changed after service creation.
+                    Eslatma: Qo'shimcha mahsulotlarni xizmat yaratilgandan keyin o'zgartirib bo'lmaydi.
                   </p>
                 </div>
               )}
 
               {/* Service Date */}
               <div>
-                <h3 className="font-semibold text-foreground mb-2">Service Date</h3>
+                <h3 className="font-semibold text-foreground mb-2">Xizmat sanasi</h3>
                 <p className="text-sm text-muted-foreground">
-                  {new Date(editingService.createdAt).toLocaleString('en-US', {
+                  {new Date(editingService.createdAt).toLocaleString('uz-UZ', {
                     year: 'numeric',
                     month: 'long',
                     day: 'numeric',
@@ -1658,10 +1812,15 @@ export default function VehicleDetailPage() {
               {/* Action Buttons */}
               <div className="flex gap-2 pt-4">
                 <Button onClick={handleUpdateService} className="flex-1">
-                  Save Changes
+                  O'zgarishlarni saqlash
                 </Button>
-                <Button variant="outline" onClick={() => setShowEditService(false)}>
-                  Cancel
+                <Button variant="outline" onClick={() => {
+                  setShowEditService(false)
+                  setEditingService(null)
+                  setEditServiceLaborCost(0)
+                  setEmployeeCommissions([]) // Reset commissions when closing
+                }}>
+                  Bekor qilish
                 </Button>
               </div>
             </div>
@@ -2245,6 +2404,15 @@ export default function VehicleDetailPage() {
                 )}
               </div>
 
+              {/* Employee Commission Control */}
+              <EmployeeCommissionControl
+                employees={employees}
+                selectedEmployees={formData.employeeIds}
+                totalServicePrice={calculateTotalPrice()}
+                commissions={employeeCommissions}
+                onCommissionsChange={setEmployeeCommissions}
+              />
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="laborCost">Ish haqi (UZS)</Label>
@@ -2424,12 +2592,14 @@ export default function VehicleDetailPage() {
                       <p className="text-[10px]"><strong>Sana:</strong> {lastServiceData?.createdAt ? new Date(lastServiceData.createdAt).toLocaleDateString() : ''}</p>
                       
                       <div className="pt-1 space-y-0.5">
-                        {lastServiceData?.oilProduct && (
+                        {(lastServiceData?.oilProduct || lastServiceData?.oilProductCustomerProvided || lastServiceData?.oilProductCustomerProvidedDetails) && (
                           <p className="text-[9px]">
                             <strong>Moy:</strong> {
-                              typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
+                              lastServiceData.oilProductCustomerProvided || lastServiceData.oilProductCustomerProvidedDetails
+                                ? (lastServiceData.oilProductCustomerProvidedDetails || 'Mijoz moy')
+                                : typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
                                 ? `${lastServiceData.oilProduct.brand || 'N/A'} ${lastServiceData.oilProduct.viscosity} ${lastServiceData.oilProduct.apiGrade || ''} (${lastServiceData.oilQuantityUsed}L)`.trim()
-                                : (lastServiceData.oilProductCustomerProvidedDetails || 'N/A')
+                                : 'N/A'
                             }
                           </p>
                         )}
@@ -2505,31 +2675,33 @@ export default function VehicleDetailPage() {
       {lastServiceData && (
         <div className="print-sticker-area" style={{ display: 'none' }}>
           {printType === 'sticker' ? (
-            <div className=" p-3 inline-block relative">
-              <div className="text-xs space-y-1 text-left" style={{ paddingRight: '60px' }}>
+            <div className=" p-3 inline-block relative" style={{ color: '#000' }}>
+              <div className="text-xs space-y-1 text-left" style={{ paddingRight: '60px', color: '#000' }}>
                 <div className="text-center ">
-                  <p className="font-bold text-sm text-[15px]" style={{ whiteSpace: 'nowrap' }}>{tenant?.companyName || 'OILER.UZ'}</p>
-                  <p className="text-[11px]">{tenant?.businessPhone || ''}</p>
+                  <p className="font-bold text-sm text-[15px]" style={{ whiteSpace: 'nowrap', color: '#000' }}>{tenant?.companyName || 'OILER.UZ'}</p>
+                  <p className="text-[11px]" style={{ color: '#000' }}>{tenant?.businessPhone || ''}</p>
                 </div>
                 
-                <p className="text-[11px] m-0"><strong>Hozirgi:</strong> {(lastServiceData?.mileage || 0).toLocaleString()} km</p>
+                <p className="text-[11px] m-0" style={{ color: '#000' }}><strong>Hozirgi:</strong> {(lastServiceData?.mileage || 0).toLocaleString()} km</p>
                 {lastServiceData?.nextServiceMileage && (
-                  <p className="text-[11px] m-0"><strong>Keyingi:</strong> {lastServiceData.nextServiceMileage.toLocaleString()} km</p>
+                  <p className="text-[11px] m-0" style={{ color: '#000' }}><strong>Keyingi:</strong> {lastServiceData.nextServiceMileage.toLocaleString()} km</p>
                 )}
-                <p className="text-[11px] m-0"><strong>Sana:</strong> {lastServiceData?.createdAt ? new Date(lastServiceData.createdAt).toLocaleDateString() : ''}</p>
+                <p className="text-[11px] m-0" style={{ color: '#000' }}><strong>Sana:</strong> {lastServiceData?.createdAt ? new Date(lastServiceData.createdAt).toLocaleDateString() : ''}</p>
                 
                 <div className=" space-y-0.5">
-                  {lastServiceData?.oilProduct && (
-                    <p className="text-[11px] m-0" style={{ whiteSpace: 'nowrap' }}>
+                  {(lastServiceData?.oilProduct || lastServiceData?.oilProductCustomerProvided || lastServiceData?.oilProductCustomerProvidedDetails) && (
+                    <p className="text-[11px] m-0" style={{ whiteSpace: 'nowrap', color: '#000' }}>
                       <strong>Moy:</strong> {
-                        typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
+                        lastServiceData.oilProductCustomerProvided || lastServiceData.oilProductCustomerProvidedDetails
+                          ? (lastServiceData.oilProductCustomerProvidedDetails || 'Mijoz moy')
+                          : typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
                           ? `${lastServiceData.oilProduct.brand || 'N/A'} ${lastServiceData.oilProduct.viscosity} ${lastServiceData.oilProduct.apiGrade || ''} (${lastServiceData.oilQuantityUsed}L)`.trim()
-                          : (lastServiceData.oilProductCustomerProvidedDetails || 'N/A')
+                          : 'N/A'
                       }
                     </p>
                   )}
                   {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided || lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && (
-                    <p className="text-[11px] m-0" style={{ whiteSpace: 'nowrap' }}>
+                    <p className="text-[11px] m-0" style={{ whiteSpace: 'nowrap', color: '#000' }}>
                       <strong>Filterlar:</strong>{' '}
                       {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && 'Moy ✓'}{(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && (lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
                       {(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && 'Havo ✓'}{(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && (lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
@@ -2538,7 +2710,7 @@ export default function VehicleDetailPage() {
                     </p>
                   )}
                   {lastServiceData?.employees && lastServiceData.employees.length > 0 && (
-                    <p className="text-[11px] mt-1">
+                    <p className="text-[11px] mt-1" style={{ color: '#000' }}>
                       <strong>Xodim:</strong> {lastServiceData.employees.map((e: any) => typeof e === 'object' && e.name ? e.name : 'N/A').join(', ')}
                     </p>
                   )}

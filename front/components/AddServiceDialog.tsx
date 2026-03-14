@@ -12,6 +12,7 @@ import { Loader2, Plus, X, Trash2 } from 'lucide-react'
 import { PaymentStatusSelector } from '@/components/PaymentStatusSelector'
 import api from '@/lib/api/axios'
 import { toast } from 'sonner'
+import { EmployeeCommissionControl } from '@/components/EmployeeCommissionControl'
 
 interface AddServiceDialogProps {
   open: boolean
@@ -35,6 +36,7 @@ interface ServiceForm {
   items: ServiceItemForm[]
   laborCost: number
   employees: string[]
+  employeeCommissions?: any[]
 }
 
 interface WorkSessionFormData {
@@ -68,7 +70,8 @@ export function AddServiceDialog({
       serviceName: '',
       items: [],
       laborCost: 0,
-      employees: []
+      employees: [],
+      employeeCommissions: []
     }],
     mileage: undefined,
     notes: '',
@@ -119,7 +122,8 @@ export function AddServiceDialog({
           serviceName: '',
           items: [],
           laborCost: 0,
-          employees: [...defaultEmployees] // Copy employees from first service
+          employees: [...defaultEmployees], // Copy employees from first service
+          employeeCommissions: []
         }
       ]
     })
@@ -226,7 +230,12 @@ export function AddServiceDialog({
     return formData.services.reduce((sum, service) => sum + calculateServiceTotal(service), 0)
   }
 
-  // Handle employee toggle for a specific service
+  // Handle employee commission change for a specific service
+  const handleEmployeeCommissionsChange = (serviceIndex: number, commissions: any[]) => {
+    const newServices = [...formData.services]
+    newServices[serviceIndex].employeeCommissions = commissions
+    setFormData({ ...formData, services: newServices })
+  }
   const handleEmployeeToggle = (serviceIndex: number, employeeId: string, checked: boolean) => {
     const newServices = [...formData.services]
     if (checked) {
@@ -326,7 +335,8 @@ export function AddServiceDialog({
           serviceName: '',
           items: [],
           laborCost: 0,
-          employees: []
+          employees: [],
+          employeeCommissions: []
         }],
         mileage: undefined,
         notes: '',
@@ -560,6 +570,15 @@ export function AddServiceDialog({
                       ))}
                     </div>
                   </div>
+
+                  {/* Employee Commission Control */}
+                  <EmployeeCommissionControl
+                    employees={employees}
+                    selectedEmployees={service.employees}
+                    totalServicePrice={calculateServiceTotal(service)}
+                    commissions={service.employeeCommissions || []}
+                    onCommissionsChange={(commissions) => handleEmployeeCommissionsChange(serviceIndex, commissions)}
+                  />
                 </div>
               ))}
             </div>

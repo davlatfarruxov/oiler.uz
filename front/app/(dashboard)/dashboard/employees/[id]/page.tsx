@@ -508,7 +508,7 @@ export default function EmployeeDetailPage() {
         <CardContent>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary/10 rounded-lg">
+              <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-lg">
                 <User className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -518,7 +518,7 @@ export default function EmployeeDetailPage() {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary/10 rounded-lg">
+              <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-lg">
                 <Phone className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -528,7 +528,7 @@ export default function EmployeeDetailPage() {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary/10 rounded-lg">
+              <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-lg">
                 <Mail className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -538,7 +538,7 @@ export default function EmployeeDetailPage() {
             </div>
             
             <div className="flex items-center gap-3">
-              <div className="p-3 bg-primary/10 rounded-lg">
+              <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-lg">
                 <Calendar className="w-5 h-5 text-primary" />
               </div>
               <div>
@@ -564,7 +564,7 @@ export default function EmployeeDetailPage() {
                     {statistics.allTime?.totalServices || 0}
                   </p>
                 </div>
-                <div className="p-3 bg-primary/10 rounded-lg">
+                <div className="p-3 bg-primary/10 dark:bg-primary/20 rounded-lg">
                   <Briefcase className="w-6 h-6 text-primary" />
                 </div>
               </div>
@@ -580,8 +580,8 @@ export default function EmployeeDetailPage() {
                     {statistics.thisMonth?.totalServices || 0}
                   </p>
                 </div>
-                <div className="p-3 bg-blue-500/10 rounded-lg">
-                  <Briefcase className="w-6 h-6 text-blue-600" />
+                <div className="p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg">
+                  <Briefcase className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
@@ -592,30 +592,30 @@ export default function EmployeeDetailPage() {
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">To'langan</p>
-                  <p className="text-2xl font-bold text-blue-600 mt-2">
+                  <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">
                     {(paymentSummary?.allTime?.totalPaid || 0).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">so'm</p>
                 </div>
-                <div className="p-3 bg-blue-500/10 rounded-lg">
-                  <CreditCard className="w-6 h-6 text-blue-600" />
+                <div className="p-3 bg-blue-500/10 dark:bg-blue-500/20 rounded-lg">
+                  <CreditCard className="w-6 h-6 text-blue-600 dark:text-blue-400" />
                 </div>
               </div>
             </CardContent>
           </Card>
 
-          <Card className="border-orange-500/50">
+          <Card className="border-orange-500/50 dark:border-orange-700/50">
             <CardContent className="pt-6">
               <div className="flex items-start justify-between">
                 <div>
                   <p className="text-sm text-muted-foreground">Qarz (berish kerak)</p>
-                  <p className="text-2xl font-bold text-orange-600 mt-2">
+                  <p className="text-2xl font-bold text-orange-600 dark:text-orange-400 mt-2">
                     {((statistics.allTime?.totalCommission || 0) - (paymentSummary?.allTime?.totalPaid || 0)).toLocaleString()}
                   </p>
                   <p className="text-xs text-muted-foreground">so'm</p>
                 </div>
-                <div className="p-3 bg-orange-500/10 rounded-lg">
-                  <DollarSign className="w-6 h-6 text-orange-600" />
+                <div className="p-3 bg-orange-500/10 dark:bg-orange-500/20 rounded-lg">
+                  <DollarSign className="w-6 h-6 text-orange-600 dark:text-orange-400" />
                 </div>
               </div>
             </CardContent>
@@ -625,7 +625,7 @@ export default function EmployeeDetailPage() {
 
       {/* Payment Action Card */}
       {statistics && paymentSummary && (
-        <Card className="border-green-500/50 bg-green-50/50">
+        <Card className="border-green-500/50 bg-green-50/50 dark:bg-green-950/20 dark:border-green-700/50">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
@@ -637,7 +637,7 @@ export default function EmployeeDetailPage() {
                   To'langan: {(paymentSummary.thisMonth?.totalPaid || 0).toLocaleString()} so'm
                 </p>
               </div>
-              <Button onClick={() => setShowPaymentDialog(true)} className="gap-2 bg-green-600 hover:bg-green-700">
+              <Button onClick={() => setShowPaymentDialog(true)} className="gap-2 bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800">
                 <CreditCard className="w-4 h-4" />
                 To'lov qilish
               </Button>
@@ -725,18 +725,18 @@ export default function EmployeeDetailPage() {
 
               {/* Summary */}
               {summary && (
-                <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+                <div className="grid grid-cols-3 gap-4 mb-6 p-4 bg-muted/50 dark:bg-muted/30 rounded-lg">
                   <div>
                     <p className="text-sm text-muted-foreground">Jami xizmatlar</p>
-                    <p className="text-lg font-bold">{summary.totalServices || 0}</p>
+                    <p className="text-lg font-bold text-foreground">{summary.totalServices || 0}</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Jami summa</p>
-                    <p className="text-lg font-bold">{(summary.totalRevenue || 0).toLocaleString()} so'm</p>
+                    <p className="text-lg font-bold text-foreground">{(summary.totalRevenue || 0).toLocaleString()} so'm</p>
                   </div>
                   <div>
                     <p className="text-sm text-muted-foreground">Jami komissiya</p>
-                    <p className="text-lg font-bold text-green-600">
+                    <p className="text-lg font-bold text-green-600 dark:text-green-400">
                       {(summary.totalCommission || 0).toLocaleString()} so'm
                     </p>
                   </div>
@@ -778,12 +778,12 @@ export default function EmployeeDetailPage() {
                               <td className="p-3">
                                 <div className="flex items-center gap-2">
                                   {service.type === 'oilChange' ? (
-                                    <Badge variant="outline" className="bg-blue-50 text-blue-700">
+                                    <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800">
                                       Moy almashtirish
                                     </Badge>
                                   ) : (
                                     <>
-                                      <Badge variant="outline" className="bg-purple-50 text-purple-700">
+                                      <Badge variant="outline" className="bg-purple-50 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800">
                                         Ish sessiyasi ({service.employeeServiceCount} ta)
                                       </Badge>
                                       <Button
@@ -805,7 +805,7 @@ export default function EmployeeDetailPage() {
                               </td>
                               <td className="p-3 text-right">
                                 <div className="flex flex-col items-end">
-                                  <span className="font-semibold text-green-600">
+                                  <span className="font-semibold text-green-600 dark:text-green-400">
                                     {(service.commission || 0).toLocaleString()} so'm
                                   </span>
                                   <span className="text-xs text-muted-foreground">
@@ -818,7 +818,7 @@ export default function EmployeeDetailPage() {
                               </td>
                               <td className="p-3 text-center">
                                 {service.paymentStatus === 'paid' && (
-                                  <Badge className="bg-green-600">To'langan</Badge>
+                                  <Badge className="bg-green-600 hover:bg-green-700 dark:bg-green-700 dark:hover:bg-green-800">To'langan</Badge>
                                 )}
                                 {service.paymentStatus === 'partial' && (
                                   <div className="flex flex-col items-center gap-1">
@@ -838,8 +838,8 @@ export default function EmployeeDetailPage() {
                             {expandedServiceId === service._id && service.type === 'service' && service.services && (
                               <tr key={`${service._id}-details`}>
                                 <td colSpan={6} className="p-0">
-                                  <div className="bg-muted/30 p-4">
-                                    <h4 className="font-semibold mb-3 text-sm">Xizmat tafsilotlari:</h4>
+                                  <div className="bg-muted/30 dark:bg-muted/20 p-4">
+                                    <h4 className="font-semibold mb-3 text-sm text-foreground">Xizmat tafsilotlari:</h4>
                                     <div className="space-y-2">
                                       {service.services
                                         .filter((s: any) => s.employees.some((e: any) => 
@@ -850,12 +850,12 @@ export default function EmployeeDetailPage() {
                                           const employeeCommission = (s.totalPrice * (service.commissionRate || 30) / 100) / employeeCount;
                                           
                                           return (
-                                            <div key={idx} className="flex justify-between items-center bg-white p-3 rounded border">
+                                            <div key={idx} className="flex justify-between items-center bg-background dark:bg-card p-3 rounded border border-border">
                                               <div>
-                                                <p className="font-medium text-sm">{s.serviceName}</p>
+                                                <p className="font-medium text-sm text-foreground">{s.serviceName}</p>
                                               </div>
                                               <div className="text-right">
-                                                <p className="font-semibold text-green-600">
+                                                <p className="font-semibold text-green-600 dark:text-green-400">
                                                   {Math.round(employeeCommission).toLocaleString()} so'm
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">
@@ -867,9 +867,9 @@ export default function EmployeeDetailPage() {
                                         })}
                                       
                                       {/* Total commission */}
-                                      <div className="flex justify-between items-center bg-green-50 p-3 rounded border-2 border-green-200 mt-3">
-                                        <p className="font-semibold text-sm">Jami komissiya:</p>
-                                        <p className="font-bold text-green-600 text-lg">
+                                      <div className="flex justify-between items-center bg-green-50 dark:bg-green-950/30 p-3 rounded border-2 border-green-200 dark:border-green-800 mt-3">
+                                        <p className="font-semibold text-sm text-foreground">Jami komissiya:</p>
+                                        <p className="font-bold text-green-600 dark:text-green-400 text-lg">
                                           {(service.commission || 0).toLocaleString()} so'm
                                         </p>
                                       </div>
@@ -943,7 +943,7 @@ export default function EmployeeDetailPage() {
                           <tr key={payment._id} className="border-t hover:bg-muted/50">
                             <td className="p-3">{formatDate(payment.paymentDate)}</td>
                             <td className="p-3">
-                              <span className="font-semibold text-green-600 text-lg">
+                              <span className="font-semibold text-green-600 dark:text-green-400 text-lg">
                                 {(payment.amount || 0).toLocaleString()} so'm
                               </span>
                             </td>
@@ -1018,11 +1018,11 @@ export default function EmployeeDetailPage() {
               </div>
               <div className="flex justify-between text-sm">
                 <span className="text-muted-foreground">To'langan:</span>
-                <span className="font-semibold text-blue-600">{(paymentSummary?.allTime?.totalPaid || 0).toLocaleString()} so'm</span>
+                <span className="font-semibold text-blue-600 dark:text-blue-400">{(paymentSummary?.allTime?.totalPaid || 0).toLocaleString()} so'm</span>
               </div>
               <div className="flex justify-between text-sm border-t pt-2">
                 <span className="text-muted-foreground">Qolgan qarz:</span>
-                <span className="font-bold text-orange-600">
+                <span className="font-bold text-orange-600 dark:text-orange-400">
                   {((statistics?.allTime?.totalCommission || 0) - (paymentSummary?.allTime?.totalPaid || 0)).toLocaleString()} so'm
                 </span>
               </div>

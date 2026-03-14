@@ -14,6 +14,7 @@ import archiveRoutes from './archiveRoutes';
 import paymentRoutes from './paymentRoutes';
 import generalServiceRoutes from './generalServiceRoutes';
 import employeePaymentRoutes from './employeePaymentRoutes';
+import publicRoutes from './publicRoutes';
 
 const router = Router();
 
@@ -32,5 +33,6 @@ router.use('/archives', archiveRoutes);
 router.use('/payments', paymentRoutes);
 router.use('/services', generalServiceRoutes);
 router.use('/employee-payments', employeePaymentRoutes);
+router.use('/public', publicRoutes);
 
 export default router;

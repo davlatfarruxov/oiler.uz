@@ -1,4 +1,5 @@
 import mongoose, { Schema, Document } from 'mongoose';
+import { v4 as uuidv4 } from 'uuid';
 
 // Individual service item (product/part within a service)
 export interface IServiceItemItem {
@@ -29,6 +30,7 @@ export interface IServiceItem {
 // Work session document (contains multiple services)
 export interface IServiceDocument extends Document {
   tenant: mongoose.Types.ObjectId;
+  publicUuid: string; // Public UUID for QR codes
   vehicle: mongoose.Types.ObjectId;
   customer: mongoose.Types.ObjectId;
   services: IServiceItem[]; // Array of services in this work session
@@ -146,6 +148,12 @@ const serviceSchema = new Schema<IServiceDocument>(
       type: Schema.Types.ObjectId,
       ref: 'Tenant',
       required: [true, 'Tenant is required'],
+      index: true
+    },
+    publicUuid: {
+      type: String,
+      unique: true,
+      default: uuidv4,
       index: true
     },
     vehicle: {
