@@ -16,13 +16,20 @@ export const getPublicService = async (req: Request, res: Response) => {
     let service = await OilChange.findOne({ publicUuid: uuid })
       .populate('vehicle', 'plateNumber brand vehicleModel')
       .populate('customer', 'name')
-      .populate('oilProduct', 'brand viscosity apiGrade')
+      .populate({
+        path: 'oilProduct',
+        select: 'viscosity apiGrade volume',
+        populate: {
+          path: 'brand',
+          select: 'name'
+        }
+      })
       .populate('oilFilter', 'brandName partNumber')
       .populate('airFilter', 'brandName partNumber')
       .populate('cabinFilter', 'brandName partNumber')
       .populate('fuelFilter', 'brandName partNumber')
       .select('publicUuid vehicle customer mileage nextServiceMileage createdAt oilProduct oilProductCustomerProvided oilProductCustomerProvidedDetails oilQuantityUsed oilFilter oilFilterCustomerProvided airFilter airFilterCustomerProvided cabinFilter cabinFilterCustomerProvided fuelFilter fuelFilterCustomerProvided');
-
+    
     let serviceType = 'oilChange';
 
     // If not found in OilChange, try Service
@@ -62,7 +69,7 @@ export const getPublicService = async (req: Request, res: Response) => {
         oilDetails: oilChangeService.oilProductCustomerProvided 
           ? oilChangeService.oilProductCustomerProvidedDetails 
           : oilChangeService.oilProduct 
-            ? `${oilChangeService.oilProduct.brand} ${oilChangeService.oilProduct.viscosity} ${oilChangeService.oilProduct.apiGrade || ''}`.trim()
+            ? `${oilChangeService.oilProduct.brand?.name || 'Unknown'} ${oilChangeService.oilProduct.viscosity} ${oilChangeService.oilProduct.apiGrade || ''}`.trim()
             : null,
         oilQuantity: Number(oilChangeService.oilQuantityUsed) || 0
       };

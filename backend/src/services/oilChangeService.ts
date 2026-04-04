@@ -564,13 +564,19 @@ export class OilChangeService {
           throw new ApiError(404, 'One or more employees not found');
         }
         
-        // Recalculate commissions
-        const laborCost = data.laborCost !== undefined ? data.laborCost : oilChange.laborCost;
-        const employeeCommissions = newEmployees.map(emp => ({
-          employee: emp._id,
-          commissionRate: emp.commissionRate,
-          commissionAmount: (laborCost * emp.commissionRate) / 100
-        }));
+        // Use provided commissions if available, otherwise use default rates
+        let employeeCommissions;
+        if (data.employeeCommissions && Array.isArray(data.employeeCommissions)) {
+          employeeCommissions = data.employeeCommissions;
+        } else {
+          // Recalculate commissions using default rates
+          const laborCost = data.laborCost !== undefined ? data.laborCost : oilChange.laborCost;
+          employeeCommissions = newEmployees.map(emp => ({
+            employee: emp._id,
+            commissionRate: emp.commissionRate,
+            commissionAmount: (laborCost * emp.commissionRate) / 100
+          }));
+        }
         
         changes.push({ 
           field: 'employees', 
@@ -580,6 +586,22 @@ export class OilChangeService {
         
         oilChange.employees = newEmployeeIds as any;
         oilChange.employeeCommissions = employeeCommissions as any;
+      }
+    }
+    
+    // Update employee commissions if provided (even without employee changes)
+    if (data.employeeCommissions && Array.isArray(data.employeeCommissions)) {
+      const oldCommissions = JSON.stringify(oilChange.employeeCommissions);
+      const newCommissions = JSON.stringify(data.employeeCommissions);
+      
+      if (oldCommissions !== newCommissions) {
+        changes.push({ 
+          field: 'employeeCommissions', 
+          oldValue: oilChange.employeeCommissions,
+          newValue: data.employeeCommissions
+        });
+        
+        oilChange.employeeCommissions = data.employeeCommissions as any;
       }
     }
     

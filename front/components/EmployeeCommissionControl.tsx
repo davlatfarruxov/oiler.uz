@@ -24,6 +24,7 @@ interface EmployeeCommissionControlProps {
   employees: Employee[]
   selectedEmployees: string[]
   totalServicePrice: number
+  laborCost: number
   commissions: EmployeeCommission[]
   onCommissionsChange: (commissions: EmployeeCommission[]) => void
 }
@@ -32,6 +33,7 @@ export function EmployeeCommissionControl({
   employees,
   selectedEmployees,
   totalServicePrice,
+  laborCost,
   commissions,
   onCommissionsChange
 }: EmployeeCommissionControlProps) {
@@ -43,6 +45,7 @@ export function EmployeeCommissionControl({
     console.log('EmployeeCommissionControl useEffect triggered:', {
       selectedEmployees,
       totalServicePrice,
+      laborCost,
       commissions,
       localCommissions
     })
@@ -57,10 +60,10 @@ export function EmployeeCommissionControl({
       const existingCommission = localCommissions.find(c => c.employee === employeeId)
       
       if (existingCommission) {
-        // Keep existing rate but update amount based on new total service price
+        // Keep existing rate but update amount based on new labor cost
         return {
           ...existingCommission,
-          commissionAmount: Math.round((totalServicePrice * existingCommission.commissionRate) / 100)
+          commissionAmount: Math.round((laborCost * existingCommission.commissionRate) / 100)
         }
       }
       
@@ -69,13 +72,13 @@ export function EmployeeCommissionControl({
       if (propsCommission) {
         return {
           ...propsCommission,
-          commissionAmount: Math.round((totalServicePrice * propsCommission.commissionRate) / 100)
+          commissionAmount: Math.round((laborCost * propsCommission.commissionRate) / 100)
         }
       }
       
       // Create new commission with employee's default rate
       const rate = employee?.commissionRate || 15
-      const amount = Math.round((totalServicePrice * rate) / 100)
+      const amount = Math.round((laborCost * rate) / 100)
       
       return {
         employee: employeeId,
@@ -87,14 +90,14 @@ export function EmployeeCommissionControl({
     console.log('Setting new commissions:', newCommissions)
     setLocalCommissions(newCommissions)
     onCommissionsChange(newCommissions)
-  }, [selectedEmployees, employees, totalServicePrice])
+  }, [selectedEmployees, employees, laborCost])
 
-  // Update commissions when totalServicePrice changes
+  // Update commissions when laborCost changes
   useEffect(() => {
     if (localCommissions.length > 0) {
       const updatedCommissions = localCommissions.map(commission => ({
         ...commission,
-        commissionAmount: Math.round((totalServicePrice * commission.commissionRate) / 100)
+        commissionAmount: Math.round((laborCost * commission.commissionRate) / 100)
       }))
       
       // Check if amounts actually changed
@@ -107,11 +110,11 @@ export function EmployeeCommissionControl({
         onCommissionsChange(updatedCommissions)
       }
     }
-  }, [totalServicePrice])
+  }, [laborCost])
 
   // Update commission amount when rate changes
   const handleRateChange = (employeeId: string, newRate: number) => {
-    const newAmount = Math.round((totalServicePrice * newRate) / 100)
+    const newAmount = Math.round((laborCost * newRate) / 100)
     
     const updatedCommissions = localCommissions.map(commission =>
       commission.employee === employeeId
@@ -126,7 +129,7 @@ export function EmployeeCommissionControl({
 
   // Update commission rate when amount changes
   const handleAmountChange = (employeeId: string, newAmount: number) => {
-    const newRate = totalServicePrice > 0 ? Math.round((newAmount * 100) / totalServicePrice) : 0
+    const newRate = laborCost > 0 ? Math.round((newAmount * 100) / laborCost) : 0
     
     const updatedCommissions = localCommissions.map(commission =>
       commission.employee === employeeId
@@ -162,6 +165,9 @@ export function EmployeeCommissionControl({
           <div className="bg-muted/50 p-3 rounded-lg">
             <div className="text-sm font-medium text-muted-foreground mb-2">
               Jami xizmat narxi: <span className="text-foreground font-bold">{totalServicePrice.toLocaleString()} so'm</span>
+            </div>
+            <div className="text-sm font-medium text-muted-foreground mb-2">
+              Ish haqi (komissiya asosi): <span className="text-foreground font-bold">{laborCost.toLocaleString()} so'm</span>
             </div>
             
             <div className="space-y-4">

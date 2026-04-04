@@ -517,9 +517,6 @@ export default function VehicleDetailPage() {
         console.log('Fetched service from API for edit:', service)
         console.log('Service employeeCommissions from API:', service.employeeCommissions)
         
-        // Show fetched commission data in alert for debugging
-        alert(`API'dan olingan komissiya ma'lumotlari:\n${JSON.stringify(service.employeeCommissions, null, 2)}`)
-        
         handleEditService(service)
       } catch (error) {
         alert('Xizmatni yuklashda xatolik yuz berdi')
@@ -681,15 +678,9 @@ export default function VehicleDetailPage() {
       
       console.log('Updating service with data:', updateData)
       console.log('Employee commissions being sent:', employeeCommissions)
-      
-      // Show commission data in alert for debugging
-      alert(`Komissiya ma'lumotlari yuborilmoqda:\n${JSON.stringify(employeeCommissions, null, 2)}`)
 
       const response = await api.put(`/oil-changes/${editingService._id}`, updateData)
       console.log('API response:', response.data)
-      
-      // Show API response in alert
-      alert(`API javobi:\n${JSON.stringify(response.data, null, 2)}`)
 
       alert('Xizmat muvaffaqiyatli yangilandi')
       setShowEditService(false)
@@ -1708,6 +1699,7 @@ export default function VehicleDetailPage() {
                       employees={employees}
                       selectedEmployees={editServiceEmployeeIds}
                       totalServicePrice={editServiceLaborCost}
+                      laborCost={editServiceLaborCost}
                       commissions={employeeCommissions}
                       onCommissionsChange={(commissions) => {
                         console.log('Commission changed in parent:', commissions)
@@ -2409,6 +2401,7 @@ export default function VehicleDetailPage() {
                 employees={employees}
                 selectedEmployees={formData.employeeIds}
                 totalServicePrice={calculateTotalPrice()}
+                laborCost={Number(formData.laborCost) || 0}
                 commissions={employeeCommissions}
                 onCommissionsChange={setEmployeeCommissions}
               />
