@@ -47,16 +47,16 @@ export const getPublicService = async (req: Request, res: Response) => {
     }
 
     // Prepare safe public data
-    const publicData = {
+    const publicData: any = {
       uuid: service.publicUuid,
-      plateNumber: service.vehicle?.plateNumber || 'N/A',
-      vehicleBrand: service.vehicle?.brand || 'N/A',
-      vehicleModel: service.vehicle?.vehicleModel || 'N/A',
-      customerName: service.customer?.name || 'N/A',
+      plateNumber: (service.vehicle as any)?.plateNumber || 'N/A',
+      vehicleBrand: (service.vehicle as any)?.brand || 'N/A',
+      vehicleModel: (service.vehicle as any)?.vehicleModel || 'N/A',
+      customerName: (service.customer as any)?.name || 'N/A',
       serviceDate: service.createdAt,
       serviceType: serviceType === 'oilChange' ? 'Moy almashtirish' : 'Umumiy xizmat',
       currentMileage: Number(service.mileage) || 0,
-      nextServiceMileage: Number(service.nextServiceMileage) || 0,
+      nextServiceMileage: Number((service as any).nextServiceMileage) || 0,
       companyName: 'OILER.UZ',
       companyPhone: '+998 78 888 0 111'
     };
@@ -64,7 +64,7 @@ export const getPublicService = async (req: Request, res: Response) => {
     // Add oil change specific data
     if (serviceType === 'oilChange') {
       const oilChangeService = service as any;
-      publicData['oilInfo'] = {
+      publicData.oilInfo = {
         hasOil: !!(oilChangeService.oilProduct || oilChangeService.oilProductCustomerProvided),
         oilDetails: oilChangeService.oilProductCustomerProvided 
           ? oilChangeService.oilProductCustomerProvidedDetails 
@@ -74,7 +74,7 @@ export const getPublicService = async (req: Request, res: Response) => {
         oilQuantity: Number(oilChangeService.oilQuantityUsed) || 0
       };
 
-      publicData['filters'] = {
+      publicData.filters = {
         oilFilter: !!(oilChangeService.oilFilter || oilChangeService.oilFilterCustomerProvided),
         airFilter: !!(oilChangeService.airFilter || oilChangeService.airFilterCustomerProvided),
         cabinFilter: !!(oilChangeService.cabinFilter || oilChangeService.cabinFilterCustomerProvided),
@@ -83,7 +83,7 @@ export const getPublicService = async (req: Request, res: Response) => {
     } else {
       // General service data
       const generalService = service as any;
-      publicData['services'] = generalService.services?.map((s: any) => s.serviceName) || [];
+      publicData.services = generalService.services?.map((s: any) => s.serviceName) || [];
     }
 
     res.json(ApiResponse.success('Xizmat ma\'lumotlari', publicData));
