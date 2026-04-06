@@ -141,7 +141,6 @@ export class ServiceService {
         items,
         laborCost: serviceData.laborCost,
         employees: serviceData.employees.map(id => id as any),
-        employeeCommissions: [],
         totalPrice: serviceTotal
       });
 
@@ -349,7 +348,6 @@ export class ServiceService {
           items,
           laborCost: serviceData.laborCost,
           employees: serviceData.employees.map(id => id as any),
-          employeeCommissions: [],
           totalPrice: serviceTotal
         });
 
