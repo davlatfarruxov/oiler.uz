@@ -224,8 +224,10 @@ export default function VehicleDetailPage() {
 
   const fetchCompanySettings = async () => {
     try {
-      const response = await api.get('/settings')
-      setCompanySettings(response.data?.data || response.data || {})
+      // Kvitansiya uchun kompaniya ma'lumotini tenant profilidan olamiz (Sozlamalar bilan bir xil manba).
+      const response = await api.get('/auth/profile')
+      const profile = response.data?.data || response.data || {}
+      setCompanySettings(profile?.tenant || {})
     } catch (error) {
       console.error('Failed to load company settings:', error)
       setCompanySettings({}) // Set empty object as fallback
@@ -1136,7 +1138,17 @@ export default function VehicleDetailPage() {
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-muted-foreground">Dvigatel turi</p>
-            <Badge variant="outline" className="mt-2 capitalize">{vehicle.engineType === 'petrol' ? 'benzin' : vehicle.engineType === 'diesel' ? 'dizel' : vehicle.engineType}</Badge>
+            <Badge variant="outline" className="mt-2 capitalize">
+              {vehicle.engineType === 'petrol'
+                ? 'benzin'
+                : vehicle.engineType === 'diesel'
+                  ? 'dizel'
+                  : vehicle.engineType === 'propane'
+                    ? 'propan'
+                    : vehicle.engineType === 'methane'
+                      ? 'metan'
+                      : vehicle.engineType}
+            </Badge>
           </CardContent>
         </Card>
       </div>
@@ -1292,6 +1304,8 @@ export default function VehicleDetailPage() {
                   <SelectItem value="diesel">Dizel</SelectItem>
                   <SelectItem value="hybrid">Gibrid</SelectItem>
                   <SelectItem value="electric">Elektr</SelectItem>
+                  <SelectItem value="propane">Propan</SelectItem>
+                  <SelectItem value="methane">Metan</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1965,7 +1979,17 @@ export default function VehicleDetailPage() {
                 </div>
                 <div>
                   <p className="text-muted-foreground">Dvigatel</p>
-                  <p className="font-medium text-foreground capitalize">{vehicle.engineType === 'petrol' ? 'Benzin' : vehicle.engineType === 'diesel' ? 'Dizel' : vehicle.engineType}</p>
+                  <p className="font-medium text-foreground capitalize">
+                    {vehicle.engineType === 'petrol'
+                      ? 'Benzin'
+                      : vehicle.engineType === 'diesel'
+                        ? 'Dizel'
+                        : vehicle.engineType === 'propane'
+                          ? 'Propan'
+                          : vehicle.engineType === 'methane'
+                            ? 'Metan'
+                            : vehicle.engineType}
+                  </p>
                 </div>
                 <div>
                   <p className="text-muted-foreground">Mijoz</p>

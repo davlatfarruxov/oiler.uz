@@ -164,6 +164,8 @@ export default function AddVehiclePage() {
                   <SelectItem value="diesel">Diesel</SelectItem>
                   <SelectItem value="hybrid">Hybrid</SelectItem>
                   <SelectItem value="electric">Electric</SelectItem>
+                  <SelectItem value="propane">Propan</SelectItem>
+                  <SelectItem value="methane">Metan</SelectItem>
                 </SelectContent>
               </Select>
             </div>

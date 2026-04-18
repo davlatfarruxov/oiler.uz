@@ -42,7 +42,7 @@ function employeeLabel(e: any) {
 
 function paymentLabel(status: string) {
   if (status === 'paid') return "To'langan"
-  if (status === 'partial') return 'Qisman tolangan'
+  if (status === 'partial') return 'Qisman'
   return "To'lanmagan"
 }
 
@@ -64,13 +64,12 @@ export function ServicePrintReceipt({
 }: ServicePrintReceiptProps) {
   if (!lastServiceData) return null
 
-  const companyName =
-    companySettings?.companyName || tenant?.companyName || 'OILER.UZ'
+  const companyName = companySettings?.companyName || tenant?.companyName || 'OILER.UZ'
   const companyPhone =
-    companySettings?.companyPhone || tenant?.businessPhone || ''
+    companySettings?.businessPhone || companySettings?.companyPhone || tenant?.businessPhone || ''
   const companyEmail =
-    companySettings?.companyEmail || tenant?.businessEmail || ''
-  const companyAddress = companySettings?.companyAddress || tenant?.address || ''
+    companySettings?.businessEmail || companySettings?.companyEmail || tenant?.businessEmail || ''
+  const companyAddress = companySettings?.address || companySettings?.companyAddress || tenant?.address || ''
 
   const isWorkSession =
     Array.isArray(lastServiceData.services) && lastServiceData.services.length > 0
@@ -476,17 +475,9 @@ export function ServicePrintReceipt({
                 </span>
               </div>
               <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 mt-1.5 pt-1.5 border-t border-slate-200 text-[10px] leading-tight">
-                <div className="flex justify-between gap-1">
-                  <span className="text-slate-600">To&apos;lov</span>
-                  <span className="font-medium">{paymentLabel(lastServiceData.paymentStatus)}</span>
-                </div>
-                <div className="flex justify-between gap-1">
-                  <span className="text-slate-600">To&apos;langan</span>
-                  <span className="font-medium">{formatUZS(lastServiceData.amountPaid)}</span>
-                </div>
                 <div className="flex justify-between gap-1 col-span-2">
-                  <span className="text-slate-600">Qoldiq (qarz)</span>
-                  <span className="font-medium text-red-700">{formatUZS(lastServiceData.amountDue)}</span>
+                  <span className="text-slate-600">To&apos;lov holati</span>
+                  <span className="font-medium">{paymentLabel(lastServiceData.paymentStatus)}</span>
                 </div>
                 {lastServiceData.dueDate && (
                   <div className="flex justify-between gap-1 col-span-2 text-slate-600">

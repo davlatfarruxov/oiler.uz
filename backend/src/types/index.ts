@@ -11,7 +11,9 @@ export enum EngineType {
   PETROL = 'petrol',
   DIESEL = 'diesel',
   HYBRID = 'hybrid',
-  ELECTRIC = 'electric'
+  ELECTRIC = 'electric',
+  PROPANE = 'propane',
+  METHANE = 'methane'
 }
 
 export enum OilType {
