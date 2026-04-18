@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useAppSelector } from '@/lib/store/hooks'
+import { canShowSection, useCanShowSection } from '@/lib/uiPermissions'
 import api from '@/lib/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -40,6 +42,8 @@ export default function InventoryPage() {
   const [newItem, setNewItem] = useState({
     productType: 'oil',
     name: '',
+    costPrice: '',
+    costCurrency: 'UZS' as 'USD' | 'UZS',
     price: '',
     stock: '',
     reorderLevel: '',
@@ -173,7 +177,15 @@ export default function InventoryPage() {
 
   const openAddDialog = (type: string) => {
     setEditingItem(null)
-    setNewItem({ productType: type, name: '', price: '', stock: '', reorderLevel: '' })
+    setNewItem({
+      productType: type,
+      name: '',
+      costPrice: '',
+      costCurrency: 'UZS',
+      price: '',
+      stock: '',
+      reorderLevel: ''
+    })
     setOpenDialog(true)
   }
 
@@ -182,6 +194,8 @@ export default function InventoryPage() {
     setNewItem({
       productType: item.productType,
       name: item.name,
+      costPrice: String(item.costPrice || ''),
+      costCurrency: (item.costCurrency || 'UZS') as 'USD' | 'UZS',
       price: String(item.price),
       stock: String(item.stock),
       reorderLevel: String(item.reorderLevel)
@@ -199,6 +213,8 @@ export default function InventoryPage() {
       const data = {
         productType: newItem.productType,
         name: newItem.name,
+        costPrice: Number(newItem.costPrice) || 0,
+        costCurrency: newItem.costCurrency,
         price: Number(newItem.price),
         stock: Number(newItem.stock),
         reorderLevel: Number(newItem.reorderLevel) || 0
@@ -485,6 +501,19 @@ export default function InventoryPage() {
   const oils = getItemsByType('oil')
   const products = getItemsByType('other')
 
+  const permissions = useAppSelector((s) => s.auth.user?.permissions)
+  const can = useCanShowSection()
+  const showOilTab = can('ui.inventory.tab_oil')
+  const showFiltersTab = can('ui.inventory.tab_filters')
+  const showProductsTab = can('ui.inventory.tab_products')
+  const defaultInvTab = useMemo(() => {
+    if (canShowSection(permissions, 'ui.inventory.tab_oil')) return 'oil-products'
+    if (canShowSection(permissions, 'ui.inventory.tab_filters')) return 'filters'
+    if (canShowSection(permissions, 'ui.inventory.tab_products')) return 'products'
+    return 'oil-products'
+  }, [permissions])
+  const hasInvTab = showOilTab || showFiltersTab || showProductsTab
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -527,6 +556,7 @@ export default function InventoryPage() {
           </CardContent>
         </Card>
 
+        {can('ui.inventory.low_stock_alert') && (
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-start justify-between gap-4">
@@ -540,9 +570,10 @@ export default function InventoryPage() {
             </div>
           </CardContent>
         </Card>
+        )}
       </div>
 
-      {lowStockItems.length > 0 && (
+      {can('ui.inventory.low_stock_alert') && lowStockItems.length > 0 && (
         <Card className="border-red-500 bg-red-50 dark:bg-red-950/20">
           <CardHeader>
             <CardTitle className="text-red-700 dark:text-red-400 flex items-center gap-2">
@@ -567,13 +598,25 @@ export default function InventoryPage() {
           <CardTitle>Ombor</CardTitle>
         </CardHeader>
         <CardContent>
-          <Tabs defaultValue="oil-products" className="space-y-4">
-            <TabsList>
+          {!hasInvTab ? (
+            <p className="text-center text-muted-foreground py-8">
+              Ombor varaqlarini ko‘rish uchun rolga tegishli UI ruxsatlari berilmagan.
+            </p>
+          ) : (
+          <Tabs defaultValue={defaultInvTab} className="space-y-4">
+            <TabsList className="flex flex-wrap h-auto gap-1">
+              {showOilTab && (
               <TabsTrigger value="oil-products">Moy mahsulotlari ({oilBrands.length} brend)</TabsTrigger>
+              )}
+              {showFiltersTab && (
               <TabsTrigger value="filters">Filterlar ({Array.from(new Set(filters.map(f => f.brandName))).length} brend)</TabsTrigger>
+              )}
+              {showProductsTab && (
               <TabsTrigger value="products">Mahsulotlar ({products.length})</TabsTrigger>
+              )}
             </TabsList>
 
+            {showOilTab && (
             <TabsContent value="oil-products" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Brands list */}
@@ -744,7 +787,9 @@ export default function InventoryPage() {
                 </Card>
               </div>
             </TabsContent>
+            )}
 
+            {showFiltersTab && (
             <TabsContent value="filters" className="space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Filter Brands list */}
@@ -953,7 +998,9 @@ export default function InventoryPage() {
                 </Card>
               </div>
             </TabsContent>
+            )}
 
+            {showProductsTab && (
             <TabsContent value="products" className="space-y-4">
               <Button onClick={() => openAddDialog('other')} className="gap-2 mb-4">
                 <Plus className="w-4 h-4" />
@@ -964,10 +1011,18 @@ export default function InventoryPage() {
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : (
-                <InventoryTable items={products} onEdit={openEditDialog} onDelete={handleDeleteItem} showReorderLevel={false} />
+                <InventoryTable
+                  items={products}
+                  onEdit={openEditDialog}
+                  onDelete={handleDeleteItem}
+                  showReorderLevel={true}
+                  usdToUzsRate={Number(settings?.exchangeRate) > 0 ? Number(settings.exchangeRate) : 12500}
+                />
               )}
             </TabsContent>
+            )}
           </Tabs>
+          )}
         </CardContent>
       </Card>
 
@@ -987,16 +1042,44 @@ export default function InventoryPage() {
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="price">Narx *</Label>
-              <Input
-                id="price"
-                type="number"
-                step="0.01"
-                value={newItem.price}
-                onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
-                required
-              />
+            <div className="grid grid-cols-3 gap-3">
+              <div>
+                <Label htmlFor="costPrice">Sotib olish narxi</Label>
+                <Input
+                  id="costPrice"
+                  type="number"
+                  step="0.01"
+                  value={newItem.costPrice}
+                  onChange={(e) => setNewItem({ ...newItem, costPrice: e.target.value })}
+                  placeholder="25000"
+                />
+              </div>
+              <div>
+                <Label htmlFor="costCurrency">Valyuta</Label>
+                <Select
+                  value={newItem.costCurrency}
+                  onValueChange={(value: 'USD' | 'UZS') => setNewItem({ ...newItem, costCurrency: value })}
+                >
+                  <SelectTrigger id="costCurrency">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="UZS">UZS</SelectItem>
+                    <SelectItem value="USD">USD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label htmlFor="price">Sotish narxi (UZS) *</Label>
+                <Input
+                  id="price"
+                  type="number"
+                  step="0.01"
+                  value={newItem.price}
+                  onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                  required
+                />
+              </div>
             </div>
             <div>
               <Label htmlFor="stock">Omborda *</Label>
@@ -1008,17 +1091,15 @@ export default function InventoryPage() {
                 required
               />
             </div>
-            {newItem.productType !== 'other' && (
-              <div>
-                <Label htmlFor="reorder">Qayta buyurtma darajasi</Label>
-                <Input
-                  id="reorder"
-                  type="number"
-                  value={newItem.reorderLevel}
-                  onChange={(e) => setNewItem({ ...newItem, reorderLevel: e.target.value })}
-                />
-              </div>
-            )}
+            <div>
+              <Label htmlFor="reorder">Qayta buyurtma darajasi</Label>
+              <Input
+                id="reorder"
+                type="number"
+                value={newItem.reorderLevel}
+                onChange={(e) => setNewItem({ ...newItem, reorderLevel: e.target.value })}
+              />
+            </div>
             <div className="flex gap-2">
               <Button type="submit" className="flex-1" disabled={isSaving}>
                 {isSaving ? (
@@ -1432,7 +1513,13 @@ export default function InventoryPage() {
   )
 }
 
-function InventoryTable({ items, onEdit, onDelete, showReorderLevel = true }: any) {
+function InventoryTable({
+  items,
+  onEdit,
+  onDelete,
+  showReorderLevel = true,
+  usdToUzsRate = 12500
+}: any) {
   if (items.length === 0) {
     return (
       <div className="text-center py-8">
@@ -1459,7 +1546,40 @@ function InventoryTable({ items, onEdit, onDelete, showReorderLevel = true }: an
           {items.map((item: any) => (
             <tr key={item._id} className="border-b border-border hover:bg-muted/50 transition-colors">
               <td className="py-3 px-4 font-semibold text-foreground">{item.name}</td>
-              <td className="py-3 px-4 text-foreground">${item.price.toFixed(2)}</td>
+              <td className="py-3 px-4 text-foreground">
+                {(() => {
+                  const costPrice = item.costPrice || 0
+                  const costCurrency = item.costCurrency || 'UZS'
+                  const conversionRate =
+                    typeof item.exchangeRateUsed === 'number' && item.exchangeRateUsed > 0
+                      ? item.exchangeRateUsed
+                      : Number(usdToUzsRate) > 0
+                        ? Number(usdToUzsRate)
+                        : 12500
+                  const costInUZS =
+                    costCurrency === 'USD' ? costPrice * conversionRate : costPrice
+                  const salePrice = item.price || 0
+                  const profit = salePrice - costInUZS
+                  const profitPercent = costInUZS > 0 ? ((profit / costInUZS) * 100).toFixed(1) : '0'
+
+                  return (
+                    <>
+                      <div className="font-medium">{salePrice.toLocaleString()} UZS</div>
+                      {costPrice > 0 && (
+                        <>
+                          <div className="text-xs text-muted-foreground">
+                            Cost: {costPrice.toLocaleString()} {costCurrency}
+                            {costCurrency === 'USD' && ` (${costInUZS.toLocaleString()} UZS)`}
+                          </div>
+                          <div className={`text-xs ${profit >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                            {profit >= 0 ? 'Foyda' : 'Zarar'}: {profit.toLocaleString()} UZS ({profitPercent}%)
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )
+                })()}
+              </td>
               <td className="py-3 px-4 text-foreground">{item.stock} units</td>
               {showReorderLevel && <td className="py-3 px-4 text-muted-foreground">{item.reorderLevel} units</td>}
               <td className="py-3 px-4">

@@ -27,10 +27,9 @@ router.get('/employee/:employeeId', employeePaymentController.getEmployeePayment
 // Get single payment
 router.get('/:paymentId', employeePaymentController.getPaymentById.bind(employeePaymentController));
 
-// Create payment (Admin/SuperAdmin only)
+// Create payment — ruxsat: employee_payments.edit (route map)
 router.post(
   '/',
-  authorize(UserRole.ADMIN, UserRole.SUPER_ADMIN),
   validate(paymentValidation),
   employeePaymentController.createPayment.bind(employeePaymentController)
 );

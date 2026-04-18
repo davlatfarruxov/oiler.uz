@@ -23,7 +23,6 @@ interface EmployeeCommission {
 interface EmployeeCommissionControlProps {
   employees: Employee[]
   selectedEmployees: string[]
-  totalServicePrice: number
   laborCost: number
   commissions: EmployeeCommission[]
   onCommissionsChange: (commissions: EmployeeCommission[]) => void
@@ -32,7 +31,6 @@ interface EmployeeCommissionControlProps {
 export function EmployeeCommissionControl({
   employees,
   selectedEmployees,
-  totalServicePrice,
   laborCost,
   commissions,
   onCommissionsChange
@@ -40,20 +38,46 @@ export function EmployeeCommissionControl({
   const [isOpen, setIsOpen] = useState(false)
   const [localCommissions, setLocalCommissions] = useState<EmployeeCommission[]>([])
 
+  const normalizeCommissions = (commissionsToNormalize: EmployeeCommission[]) => {
+    if (laborCost <= 0) {
+      return commissionsToNormalize.map((commission) => ({
+        ...commission,
+        commissionRate: 0,
+        commissionAmount: 0
+      }))
+    }
+
+    const total = commissionsToNormalize.reduce((sum, commission) => sum + commission.commissionAmount, 0)
+    if (total <= laborCost) {
+      return commissionsToNormalize
+    }
+
+    const scale = laborCost / total
+    return commissionsToNormalize.map((commission) => {
+      const normalizedAmount = Math.round(commission.commissionAmount * scale)
+      const normalizedRate = Math.round((normalizedAmount * 10000) / laborCost) / 100
+      return {
+        ...commission,
+        commissionRate: normalizedRate,
+        commissionAmount: normalizedAmount
+      }
+    })
+  }
+
   // Initialize commissions when props change
   useEffect(() => {
-    console.log('EmployeeCommissionControl useEffect triggered:', {
-      selectedEmployees,
-      totalServicePrice,
-      laborCost,
-      commissions,
-      localCommissions
-    })
-    
     if (selectedEmployees.length === 0) {
       setLocalCommissions([])
       return
     }
+
+    const selectedEmployeesData = selectedEmployees
+      .map(employeeId => employees.find(e => e._id === employeeId))
+      .filter(Boolean) as Employee[]
+    const totalDefaultRate = selectedEmployeesData.reduce((sum, employee) => sum + (employee.commissionRate || 0), 0)
+    const sharedDefaultRate = selectedEmployees.length > 0
+      ? Math.round(((totalDefaultRate / selectedEmployees.length) / selectedEmployees.length) * 100) / 100
+      : 0
 
     const newCommissions = selectedEmployees.map(employeeId => {
       const employee = employees.find(e => e._id === employeeId)
@@ -76,20 +100,35 @@ export function EmployeeCommissionControl({
         }
       }
       
-      // Create new commission with employee's default rate
-      const rate = employee?.commissionRate || 15
-      const amount = Math.round((laborCost * rate) / 100)
+      // Use a shared default rate and split equally between selected employees.
+      const defaultRate = sharedDefaultRate
+      const amount = Math.round((laborCost * defaultRate) / 100)
       
       return {
         employee: employeeId,
-        commissionRate: rate,
+        commissionRate: defaultRate,
         commissionAmount: amount
       }
     })
     
-    console.log('Setting new commissions:', newCommissions)
-    setLocalCommissions(newCommissions)
-    onCommissionsChange(newCommissions)
+    const normalizedCommissions = normalizeCommissions(newCommissions)
+
+    const hasChanged =
+      normalizedCommissions.length !== localCommissions.length ||
+      normalizedCommissions.some((next, index) => {
+        const current = localCommissions[index]
+        if (!current) return true
+        return (
+          current.employee !== next.employee ||
+          current.commissionRate !== next.commissionRate ||
+          current.commissionAmount !== next.commissionAmount
+        )
+      })
+
+    if (hasChanged) {
+      setLocalCommissions(normalizedCommissions)
+      onCommissionsChange(normalizedCommissions)
+    }
   }, [selectedEmployees, employees, laborCost])
 
   // Update commissions when laborCost changes
@@ -99,15 +138,16 @@ export function EmployeeCommissionControl({
         ...commission,
         commissionAmount: Math.round((laborCost * commission.commissionRate) / 100)
       }))
+      const normalizedCommissions = normalizeCommissions(updatedCommissions)
       
       // Check if amounts actually changed
-      const hasChanged = updatedCommissions.some((updated, index) => 
+      const hasChanged = normalizedCommissions.some((updated, index) => 
         updated.commissionAmount !== localCommissions[index].commissionAmount
       )
       
       if (hasChanged) {
-        setLocalCommissions(updatedCommissions)
-        onCommissionsChange(updatedCommissions)
+        setLocalCommissions(normalizedCommissions)
+        onCommissionsChange(normalizedCommissions)
       }
     }
   }, [laborCost])
@@ -121,10 +161,10 @@ export function EmployeeCommissionControl({
         ? { ...commission, commissionRate: newRate, commissionAmount: newAmount }
         : commission
     )
+    const normalizedCommissions = normalizeCommissions(updatedCommissions)
     
-    console.log('Rate changed, updating commissions:', updatedCommissions)
-    setLocalCommissions(updatedCommissions)
-    onCommissionsChange(updatedCommissions)
+    setLocalCommissions(normalizedCommissions)
+    onCommissionsChange(normalizedCommissions)
   }
 
   // Update commission rate when amount changes
@@ -136,10 +176,10 @@ export function EmployeeCommissionControl({
         ? { ...commission, commissionRate: newRate, commissionAmount: newAmount }
         : commission
     )
+    const normalizedCommissions = normalizeCommissions(updatedCommissions)
     
-    console.log('Amount changed, updating commissions:', updatedCommissions)
-    setLocalCommissions(updatedCommissions)
-    onCommissionsChange(updatedCommissions)
+    setLocalCommissions(normalizedCommissions)
+    onCommissionsChange(normalizedCommissions)
   }
 
   const totalCommission = localCommissions.reduce((sum, c) => sum + c.commissionAmount, 0)
@@ -163,10 +203,7 @@ export function EmployeeCommissionControl({
         
         <CollapsibleContent className="space-y-4 pt-4">
           <div className="bg-muted/50 p-3 rounded-lg">
-            <div className="text-sm font-medium text-muted-foreground mb-2">
-              Jami xizmat narxi: <span className="text-foreground font-bold">{totalServicePrice.toLocaleString()} so'm</span>
-            </div>
-            <div className="text-sm font-medium text-muted-foreground mb-2">
+            <div className="text-sm font-medium text-muted-foreground mb-4">
               Ish haqi (komissiya asosi): <span className="text-foreground font-bold">{laborCost.toLocaleString()} so'm</span>
             </div>
             

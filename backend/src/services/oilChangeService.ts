@@ -106,11 +106,14 @@ export class OilChangeService {
 
     // Calculate employee commissions
     const laborCost = data.laborCost || 0;
+    const employeeCount = employees.length || 1;
+    const totalDefaultRate = employees.reduce((sum, emp) => sum + (emp.commissionRate || 0), 0);
+    const sharedDefaultRate = Math.round(((totalDefaultRate / employeeCount) / employeeCount) * 100) / 100;
     const employeeCommissions = employees.map(emp => {
-      const commissionAmount = (laborCost * emp.commissionRate) / 100;
+      const commissionAmount = (laborCost * sharedDefaultRate) / 100;
       return {
         employee: emp._id,
-        commissionRate: emp.commissionRate,
+        commissionRate: sharedDefaultRate,
         commissionAmount: commissionAmount
       };
     });
@@ -571,11 +574,16 @@ export class OilChangeService {
         } else {
           // Recalculate commissions using default rates
           const laborCost = data.laborCost !== undefined ? data.laborCost : oilChange.laborCost;
-          employeeCommissions = newEmployees.map(emp => ({
+          const employeeCount = newEmployees.length || 1;
+          const totalDefaultRate = newEmployees.reduce((sum, emp) => sum + (emp.commissionRate || 0), 0);
+          const sharedDefaultRate = Math.round(((totalDefaultRate / employeeCount) / employeeCount) * 100) / 100;
+          employeeCommissions = newEmployees.map(emp => {
+            return ({
             employee: emp._id,
-            commissionRate: emp.commissionRate,
-            commissionAmount: (laborCost * emp.commissionRate) / 100
-          }));
+            commissionRate: sharedDefaultRate,
+            commissionAmount: (laborCost * sharedDefaultRate) / 100
+          });
+          });
         }
         
         changes.push({ 

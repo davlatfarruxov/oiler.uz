@@ -10,6 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Textarea } from '@/components/ui/textarea'
 import { Loader2, Plus, X, Trash2 } from 'lucide-react'
 import { PaymentStatusSelector } from '@/components/PaymentStatusSelector'
+import { EmployeeCommissionControl } from '@/components/EmployeeCommissionControl'
 import api from '@/lib/api/axios'
 import { toast } from 'sonner'
 
@@ -34,6 +35,7 @@ interface ServiceForm {
   items: ServiceItemForm[]
   laborCost: number
   employees: string[]
+  employeeCommissions?: any[]
 }
 
 interface WorkSessionFormData {
@@ -94,7 +96,12 @@ export function EditServiceDialog({
             totalPrice: item.totalPrice
           })),
           laborCost: s.laborCost,
-          employees: s.employees?.map((e: any) => e._id || e) || []
+          employees: s.employees?.map((e: any) => e._id || e) || [],
+          employeeCommissions: (s.employeeCommissions || []).map((commission: any) => ({
+            employee: commission.employee?._id || commission.employee,
+            commissionRate: commission.commissionRate,
+            commissionAmount: commission.commissionAmount
+          }))
         })),
         mileage: service.mileage,
         notes: service.notes || '',
@@ -138,7 +145,8 @@ export function EditServiceDialog({
           serviceName: '',
           items: [],
           laborCost: 0,
-          employees: [...defaultEmployees]
+          employees: [...defaultEmployees],
+          employeeCommissions: []
         }
       ]
     })
@@ -251,7 +259,16 @@ export function EditServiceDialog({
       newServices[serviceIndex].employees = [...newServices[serviceIndex].employees, employeeId]
     } else {
       newServices[serviceIndex].employees = newServices[serviceIndex].employees.filter(id => id !== employeeId)
+      newServices[serviceIndex].employeeCommissions = (newServices[serviceIndex].employeeCommissions || []).filter(
+        (commission: any) => commission.employee !== employeeId
+      )
     }
+    setFormData({ ...formData, services: newServices })
+  }
+
+  const handleEmployeeCommissionsChange = (serviceIndex: number, commissions: any[]) => {
+    const newServices = [...formData.services]
+    newServices[serviceIndex].employeeCommissions = commissions
     setFormData({ ...formData, services: newServices })
   }
 
@@ -559,6 +576,14 @@ export function EditServiceDialog({
                       ))}
                     </div>
                   </div>
+
+                  <EmployeeCommissionControl
+                    employees={employees}
+                    selectedEmployees={service.employees}
+                    laborCost={service.laborCost}
+                    commissions={service.employeeCommissions || []}
+                    onCommissionsChange={(commissions) => handleEmployeeCommissionsChange(serviceIndex, commissions)}
+                  />
                 </div>
               ))}
             </div>

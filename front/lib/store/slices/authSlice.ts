@@ -1,27 +1,30 @@
 import { createSlice, createAsyncThunk, PayloadAction } from '@reduxjs/toolkit';
 import api from '@/lib/api/axios';
 
-interface User {
+export interface AuthUser {
   id: string;
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   role: string;
   tenantId?: string;
   isTenantOwner?: boolean;
+  permissions?: string[];
+  assignedRole?: { id: string; name: string };
 }
 
 interface Tenant {
   id: string;
   companyName: string;
-  businessEmail: string;
-  businessPhone: string;
+  businessEmail?: string;
+  businessPhone?: string;
   address?: string;
   plan: string;
   isActive: boolean;
 }
 
 interface AuthState {
-  user: User | null;
+  user: AuthUser | null;
   tenant: Tenant | null;
   accessToken: string | null;
   isLoading: boolean;
@@ -51,33 +54,47 @@ const getInitialState = (): AuthState => {
 
 const initialState: AuthState = getInitialState();
 
+function unwrapApiData(res: { data?: unknown }) {
+  const b = res.data as Record<string, unknown> | undefined;
+  if (b && typeof b === 'object' && 'data' in b && b.data !== undefined) {
+    return b.data;
+  }
+  return b;
+}
+
+type AuthPayload = {
+  user: AuthUser;
+  tenant: Tenant;
+  accessToken: string;
+};
+
 export const register = createAsyncThunk(
   'auth/register',
-  async (data: { 
-    name: string; 
-    email: string; 
+  async (data: {
+    name: string;
+    email: string;
     password: string;
     companyName: string;
-    businessEmail: string;
-    businessPhone: string;
+    businessEmail?: string;
+    businessPhone?: string;
     address?: string;
   }) => {
     const response = await api.post('/auth/register', data);
-    return response.data.data;
+    return unwrapApiData(response) as AuthPayload;
   }
 );
 
 export const login = createAsyncThunk(
   'auth/login',
-  async (data: { email: string; password: string }) => {
+  async (data: { identifier: string; password: string }) => {
     const response = await api.post('/auth/login', data);
-    return response.data.data;
+    return unwrapApiData(response) as AuthPayload;
   }
 );
 
 export const getProfile = createAsyncThunk('auth/profile', async () => {
   const response = await api.get('/auth/profile');
-  return response.data.data;
+  return unwrapApiData(response) as { user: AuthUser; tenant: Tenant };
 });
 
 export const logoutUser = createAsyncThunk('auth/logout', async () => {
@@ -97,7 +114,7 @@ const authSlice = createSlice({
         localStorage.removeItem('tenant');
       }
     },
-    setCredentials: (state, action: PayloadAction<{ user: User; tenant?: Tenant; accessToken: string }>) => {
+    setCredentials: (state, action: PayloadAction<{ user: AuthUser; tenant?: Tenant; accessToken: string }>) => {
       state.user = action.payload.user;
       state.tenant = action.payload.tenant || null;
       state.accessToken = action.payload.accessToken;
@@ -117,13 +134,14 @@ const authSlice = createSlice({
       })
       .addCase(register.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
-        state.tenant = action.payload.tenant;
-        state.accessToken = action.payload.accessToken;
+        const p = action.payload as AuthPayload;
+        state.user = p.user;
+        state.tenant = p.tenant;
+        state.accessToken = p.accessToken;
         if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', action.payload.accessToken);
-          if (action.payload.tenant) {
-            localStorage.setItem('tenant', JSON.stringify(action.payload.tenant));
+          localStorage.setItem('accessToken', p.accessToken);
+          if (p.tenant) {
+            localStorage.setItem('tenant', JSON.stringify(p.tenant));
           }
         }
       })
@@ -137,13 +155,14 @@ const authSlice = createSlice({
       })
       .addCase(login.fulfilled, (state, action) => {
         state.isLoading = false;
-        state.user = action.payload.user;
-        state.tenant = action.payload.tenant;
-        state.accessToken = action.payload.accessToken;
+        const p = action.payload as AuthPayload;
+        state.user = p.user;
+        state.tenant = p.tenant;
+        state.accessToken = p.accessToken;
         if (typeof window !== 'undefined') {
-          localStorage.setItem('accessToken', action.payload.accessToken);
-          if (action.payload.tenant) {
-            localStorage.setItem('tenant', JSON.stringify(action.payload.tenant));
+          localStorage.setItem('accessToken', p.accessToken);
+          if (p.tenant) {
+            localStorage.setItem('tenant', JSON.stringify(p.tenant));
           }
         }
       })
@@ -152,7 +171,11 @@ const authSlice = createSlice({
         state.error = action.error.message || 'Login failed';
       })
       .addCase(getProfile.fulfilled, (state, action) => {
-        state.user = action.payload;
+        state.user = action.payload.user;
+        state.tenant = action.payload.tenant;
+        if (typeof window !== 'undefined') {
+          localStorage.setItem('tenant', JSON.stringify(action.payload.tenant));
+        }
       })
       .addCase(logoutUser.fulfilled, (state) => {
         state.user = null;

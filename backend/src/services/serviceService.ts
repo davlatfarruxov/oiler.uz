@@ -21,6 +21,11 @@ interface CreateWorkSessionData {
     }[];
     laborCost: number;
     employees: string[]; // Each service has its own employees
+    employeeCommissions?: {
+      employee: string;
+      commissionRate: number;
+      commissionAmount: number;
+    }[];
   }[];
   employees?: string[]; // Deprecated: kept for backward compatibility
   mileage?: number;
@@ -42,6 +47,11 @@ interface UpdateServiceData {
     }[];
     laborCost: number;
     employees: string[];
+    employeeCommissions?: {
+      employee: string;
+      commissionRate: number;
+      commissionAmount: number;
+    }[];
   }[];
   employees?: string[]; // Deprecated: kept for backward compatibility
   mileage?: number;
@@ -109,6 +119,7 @@ export class ServiceService {
       }
     }
 
+    let employeeMap = new Map<string, any>();
     if (allEmployeeIds.size > 0) {
       const employees = await Employee.find({
         _id: { $in: Array.from(allEmployeeIds) },
@@ -118,6 +129,8 @@ export class ServiceService {
       if (employees.length !== allEmployeeIds.size) {
         throw new ApiError(404, 'One or more employees not found');
       }
+
+      employeeMap = new Map(employees.map((employee: any) => [employee._id.toString(), employee]));
     }
 
     const services: IServiceItem[] = [];
@@ -135,12 +148,19 @@ export class ServiceService {
 
       const itemsTotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
       const serviceTotal = itemsTotal + serviceData.laborCost;
+      const employeeCommissions = this.resolveEmployeeCommissions(
+        serviceData.employees,
+        serviceData.laborCost,
+        employeeMap,
+        serviceData.employeeCommissions
+      );
 
       services.push({
         serviceName: serviceData.serviceName,
         items,
         laborCost: serviceData.laborCost,
         employees: serviceData.employees.map(id => id as any),
+        employeeCommissions,
         totalPrice: serviceTotal
       });
 
@@ -342,12 +362,30 @@ export class ServiceService {
 
         const itemsTotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
         const serviceTotal = itemsTotal + serviceData.laborCost;
+        const employeeIds = serviceData.employees || [];
+        const employees = await Employee.find({
+          _id: { $in: employeeIds },
+          tenant: tenantId
+        });
+
+        if (employees.length !== employeeIds.length) {
+          throw new ApiError(404, 'One or more employees not found');
+        }
+
+        const employeeMap = new Map(employees.map((employee: any) => [employee._id.toString(), employee]));
+        const employeeCommissions = this.resolveEmployeeCommissions(
+          employeeIds,
+          serviceData.laborCost,
+          employeeMap,
+          serviceData.employeeCommissions
+        );
 
         newServices.push({
           serviceName: serviceData.serviceName,
           items,
           laborCost: serviceData.laborCost,
           employees: serviceData.employees.map(id => id as any),
+          employeeCommissions,
           totalPrice: serviceTotal
         });
 
@@ -438,6 +476,69 @@ export class ServiceService {
     }
 
     return service;
+  }
+
+  private resolveEmployeeCommissions(
+    employeeIds: string[],
+    laborCost: number,
+    employeeMap: Map<string, any>,
+    providedCommissions?: { employee: string; commissionRate: number; commissionAmount: number }[]
+  ): Array<{ employee: any; commissionRate: number; commissionAmount: number; commissionStatus: 'pending' }> {
+    if (!employeeIds || employeeIds.length === 0) {
+      return [];
+    }
+
+    const selectedEmployeeIds = new Set(employeeIds.map(String));
+
+    const commissionOverrides = new Map<string, { commissionRate: number; commissionAmount: number }>();
+    if (providedCommissions && providedCommissions.length > 0) {
+      for (const commission of providedCommissions) {
+        const employeeId = String(commission.employee);
+        if (!selectedEmployeeIds.has(employeeId)) {
+          throw new ApiError(400, 'Employee commission contains unselected employee');
+        }
+
+        if (commission.commissionRate < 0 || commission.commissionRate > 100) {
+          throw new ApiError(400, 'Employee commission rate must be between 0 and 100');
+        }
+
+        if (commission.commissionAmount < 0) {
+          throw new ApiError(400, 'Employee commission amount cannot be negative');
+        }
+
+        commissionOverrides.set(employeeId, {
+          commissionRate: commission.commissionRate,
+          commissionAmount: commission.commissionAmount
+        });
+      }
+    }
+
+    const totalDefaultRate = employeeIds.reduce((sum, employeeId) => {
+      const employee = employeeMap.get(String(employeeId));
+      return sum + (employee?.commissionRate ?? 0);
+    }, 0);
+    const sharedDefaultRate =
+      employeeIds.length > 0
+        ? Math.round(((totalDefaultRate / employeeIds.length) / employeeIds.length) * 100) / 100
+        : 0;
+
+    return employeeIds.map((employeeId) => {
+      const employee = employeeMap.get(String(employeeId));
+      if (!employee) {
+        throw new ApiError(404, 'One or more employees not found');
+      }
+
+      const override = commissionOverrides.get(String(employeeId));
+      const commissionRate = override?.commissionRate ?? sharedDefaultRate;
+      const commissionAmount = override?.commissionAmount ?? (laborCost * commissionRate) / 100;
+
+      return {
+        employee: employee._id,
+        commissionRate,
+        commissionAmount,
+        commissionStatus: 'pending' as const
+      };
+    });
   }
 
   async listServices(tenantId: string, filters: ListServicesFilters): Promise<IServiceDocument[]> {

@@ -2,8 +2,7 @@
 
 import React from "react"
 
-import { useEffect } from 'react'
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useAppDispatch, useAppSelector } from '@/lib/store/hooks'
@@ -15,7 +14,6 @@ import { cn } from '@/lib/utils'
 import {
   BarChart3,
   Wrench,
-  Car,
   Users,
   Package,
   Settings,
@@ -25,16 +23,29 @@ import {
   Loader2,
   Building2,
   Archive,
+  Shield,
+  KeyRound,
+  UserCog,
 } from 'lucide-react'
 import { Toaster } from 'sonner'
 
-const sidebarItems = [
-  { name: 'Bosh sahifa', href: '/dashboard', icon: BarChart3 },
-  { name: 'Xizmat', href: '/dashboard/service', icon: Wrench },
-  { name: 'Xodimlar', href: '/dashboard/employees', icon: Users },
-  { name: 'Ombor', href: '/dashboard/inventory', icon: Package },
-  { name: 'Arxiv', href: '/dashboard/archives', icon: Archive },
-  { name: 'Sozlamalar', href: '/dashboard/settings', icon: Settings },
+type NavItem = {
+  name: string
+  href: string
+  icon: React.ComponentType<{ className?: string }>
+  perm: string
+}
+
+const ALL_NAV: NavItem[] = [
+  { name: 'Bosh sahifa', href: '/dashboard', icon: BarChart3, perm: 'dashboard.view' },
+  { name: 'Xizmat', href: '/dashboard/service', icon: Wrench, perm: 'service.view' },
+  { name: 'Xodimlar', href: '/dashboard/employees', icon: Users, perm: 'employees.view' },
+  { name: 'Ombor', href: '/dashboard/inventory', icon: Package, perm: 'inventory.view' },
+  { name: 'Arxiv', href: '/dashboard/archives', icon: Archive, perm: 'archives.view' },
+  { name: 'Sozlamalar', href: '/dashboard/settings', icon: Settings, perm: 'settings.view' },
+  { name: 'Rollar', href: '/dashboard/roles', icon: Shield, perm: 'roles.manage' },
+  { name: 'Foydalanuvchilar', href: '/dashboard/tenant-users', icon: UserCog, perm: 'users.manage' },
+  { name: 'Seanslar', href: '/dashboard/sessions', icon: KeyRound, perm: 'sessions.view' },
 ]
 
 export default function DashboardLayout({
@@ -56,6 +67,12 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
   const dispatch = useAppDispatch()
   const { user, accessToken, isLoading } = useAppSelector((state) => state.auth)
   const { tenant } = useTenant()
+
+  const sidebarItems = useMemo(() => {
+    const perms = user?.permissions
+    if (!perms || perms.length === 0) return ALL_NAV
+    return ALL_NAV.filter((item) => perms.includes(item.perm))
+  }, [user?.permissions])
 
   useEffect(() => {
     if (!accessToken) {
@@ -182,8 +199,10 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
               <h2 className="text-lg font-semibold text-foreground">
                 {tenant?.companyName || 'Boshqaruv paneli'}
               </h2>
-              {tenant?.businessEmail && (
-                <span className="text-xs text-muted-foreground">{tenant.businessEmail}</span>
+              {(tenant?.businessEmail || tenant?.businessPhone) && (
+                <span className="text-xs text-muted-foreground">
+                  {tenant.businessEmail || tenant.businessPhone}
+                </span>
               )}
             </div>
           </div>
@@ -191,7 +210,9 @@ function DashboardContent({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
             <div className="hidden sm:flex flex-col items-end">
               <span className="text-sm font-medium text-foreground">{user.name}</span>
-              <span className="text-xs text-muted-foreground capitalize">{user.role.replace('_', ' ')}</span>
+              <span className="text-xs text-muted-foreground">
+                {user.phone || user.email || user.role}
+              </span>
             </div>
             <div className="w-8 h-8 bg-primary rounded-full flex items-center justify-center">
               <span className="text-xs font-bold text-primary-foreground">

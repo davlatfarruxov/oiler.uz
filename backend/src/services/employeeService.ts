@@ -23,6 +23,18 @@ interface EmployeeWithStats extends IEmployeeDocument {
 }
 
 export class EmployeeService {
+  private getEmployeeCommissionAmount(employeeId: string, employeeCommissions: any[] = []): number {
+    const matchedCommission = employeeCommissions.find((commission: any) => {
+      const commissionEmployeeId =
+        typeof commission.employee === 'string'
+          ? commission.employee
+          : commission.employee?._id?.toString?.() || commission.employee?.toString?.();
+      return commissionEmployeeId === employeeId;
+    });
+
+    return matchedCommission?.commissionAmount || 0;
+  }
+
   async createEmployee(tenantId: string, data: CreateEmployeeData): Promise<IEmployeeDocument> {
     // Check if email already exists within this tenant
     const existingEmployee = await Employee.findOne({ 
@@ -385,11 +397,6 @@ export class EmployeeService {
     await this.getEmployeeById(tenantId, employeeId);
 
     const Service = require('../models/Service').default;
-    const Settings = require('../models/Settings').default;
-
-    // Get commission rate from settings
-    const settings = await Settings.findOne({ tenant: tenantId });
-    const commissionRate = settings?.employeeCommissionRate || 30;
 
     // Build match query
     const matchQuery: any = {
@@ -448,8 +455,11 @@ export class EmployeeService {
 
     // Format oil changes
     const formattedOilChanges = oilChanges.map((service: any) => {
-      const employeeCount = service.employees?.length || 1;
-      const commission = (service.price * commissionRate / 100) / employeeCount;
+      const commission = this.getEmployeeCommissionAmount(employeeId, service.employeeCommissions || []);
+      const employeeCommission = (service.employeeCommissions || []).find((item: any) => {
+        const id = typeof item.employee === 'string' ? item.employee : item.employee?._id?.toString?.() || item.employee?.toString?.();
+        return id === employeeId;
+      });
 
       return {
         _id: service._id,
@@ -463,9 +473,8 @@ export class EmployeeService {
         amountPaid: service.amountPaid,
         amountDue: service.amountDue,
         employees: service.employees,
-        employeeCount,
         commission: Math.round(commission),
-        commissionRate
+        commissionRate: employeeCommission?.commissionRate || 0
       };
     });
 
@@ -479,8 +488,7 @@ export class EmployeeService {
         const isInService = s.employees.some((e: any) => e._id.toString() === employeeId);
         if (isInService) {
           employeeServiceCount++;
-          const employeeCount = s.employees.length;
-          const serviceCommission = (s.totalPrice * commissionRate / 100) / employeeCount;
+          const serviceCommission = this.getEmployeeCommissionAmount(employeeId, s.employeeCommissions || []);
           totalCommission += serviceCommission;
         }
       });
@@ -500,7 +508,7 @@ export class EmployeeService {
         services: service.services,
         employeeServiceCount,
         commission: Math.round(totalCommission),
-        commissionRate
+        commissionRate: null
       };
     });
 
@@ -528,8 +536,7 @@ export class EmployeeService {
       summary: {
         totalServices,
         totalRevenue,
-        totalCommission,
-        commissionRate
+        totalCommission
       }
     };
   }
@@ -538,10 +545,6 @@ export class EmployeeService {
     await this.getEmployeeById(tenantId, employeeId);
 
     const Service = require('../models/Service').default;
-    const Settings = require('../models/Settings').default;
-
-    const settings = await Settings.findOne({ tenant: tenantId });
-    const commissionRate = settings?.employeeCommissionRate || 30;
 
     const now = new Date();
     const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
@@ -581,8 +584,7 @@ export class EmployeeService {
 
     monthOilChanges.forEach((service: any) => {
       monthRevenue += service.price;
-      const employeeCount = service.employees?.length || 1;
-      monthCommission += (service.price * commissionRate / 100) / employeeCount;
+      monthCommission += this.getEmployeeCommissionAmount(employeeId, service.employeeCommissions || []);
     });
 
     monthGeneralServices.forEach((service: any) => {
@@ -590,8 +592,7 @@ export class EmployeeService {
       service.services.forEach((s: any) => {
         const isInService = s.employees.some((e: any) => e.toString() === employeeId);
         if (isInService) {
-          const employeeCount = s.employees.length;
-          monthCommission += (s.totalPrice * commissionRate / 100) / employeeCount;
+          monthCommission += this.getEmployeeCommissionAmount(employeeId, s.employeeCommissions || []);
         }
       });
     });
@@ -614,8 +615,7 @@ export class EmployeeService {
 
     allOilChanges.forEach((service: any) => {
       allTimeRevenue += service.price;
-      const employeeCount = service.employees?.length || 1;
-      allTimeCommission += (service.price * commissionRate / 100) / employeeCount;
+      allTimeCommission += this.getEmployeeCommissionAmount(employeeId, service.employeeCommissions || []);
     });
 
     allGeneralServices.forEach((service: any) => {
@@ -623,8 +623,7 @@ export class EmployeeService {
       service.services.forEach((s: any) => {
         const isInService = s.employees.some((e: any) => e.toString() === employeeId);
         if (isInService) {
-          const employeeCount = s.employees.length;
-          allTimeCommission += (s.totalPrice * commissionRate / 100) / employeeCount;
+          allTimeCommission += this.getEmployeeCommissionAmount(employeeId, s.employeeCommissions || []);
         }
       });
     });
@@ -639,8 +638,7 @@ export class EmployeeService {
         totalServices: monthOilChanges.length + monthGeneralServices.length,
         totalRevenue: Math.round(monthRevenue),
         totalCommission: Math.round(monthCommission)
-      },
-      commissionRate
+      }
     };
   }
 
@@ -649,9 +647,6 @@ export class EmployeeService {
       tenant: new mongoose.Types.ObjectId(tenantId),
       isArchived: { $ne: true }
     }).lean();
-
-    const settings = await Settings.findOne({ tenant: new mongoose.Types.ObjectId(tenantId) });
-    const commissionRate = settings?.employeeCommissionRate || 30;
 
     let totalCommission = 0;
     let totalPaid = 0;
@@ -665,8 +660,7 @@ export class EmployeeService {
       }).lean();
 
       oilChanges.forEach((service: any) => {
-        const employeeCount = service.employees?.length || 1;
-        totalCommission += (service.price * commissionRate / 100) / employeeCount;
+        totalCommission += this.getEmployeeCommissionAmount(employee._id.toString(), service.employeeCommissions || []);
       });
 
       // Calculate commission from general services
@@ -680,8 +674,7 @@ export class EmployeeService {
         service.services.forEach((s: any) => {
           const isInService = s.employees.some((e: any) => e.toString() === employee._id.toString());
           if (isInService) {
-            const employeeCount = s.employees.length;
-            totalCommission += (s.totalPrice * commissionRate / 100) / employeeCount;
+            totalCommission += this.getEmployeeCommissionAmount(employee._id.toString(), s.employeeCommissions || []);
           }
         });
       });

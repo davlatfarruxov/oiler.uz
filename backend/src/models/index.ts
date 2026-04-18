@@ -1,5 +1,7 @@
 // Export all models from a single entry point
 export { default as User } from './User';
+export { default as Role } from './Role';
+export { default as Session } from './Session';
 export { default as Customer } from './Customer';
 export { default as Employee } from './Employee';
 export { default as Vehicle } from './Vehicle';

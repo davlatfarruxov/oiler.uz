@@ -7,6 +7,8 @@ export interface IInventoryDocument extends Document {
   name: string;
   stock: number;
   reorderLevel: number;
+  costPrice?: number;
+  costCurrency?: 'USD' | 'UZS';
   price: number;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +43,16 @@ const inventorySchema = new Schema<IInventoryDocument>(
       required: [true, 'Reorder level is required'],
       min: 0,
       default: 10
+    },
+    costPrice: {
+      type: Number,
+      min: 0,
+      default: 0
+    },
+    costCurrency: {
+      type: String,
+      enum: ['USD', 'UZS'],
+      default: 'UZS'
     },
     price: {
       type: Number,

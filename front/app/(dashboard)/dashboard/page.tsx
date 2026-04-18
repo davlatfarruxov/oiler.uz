@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useAppSelector } from '@/lib/store/hooks'
+import { useCanShowSection } from '@/lib/uiPermissions'
 import api from '@/lib/api/axios'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -47,6 +48,7 @@ const StatCard = ({ title, value, icon: Icon, description, isLoading }: any) => 
 
 export default function DashboardPage() {
   const { user } = useAppSelector((state) => state.auth)
+  const can = useCanShowSection()
   const [stats, setStats] = useState({
     todayServices: 0,
     totalVehicles: 0,
@@ -75,7 +77,10 @@ export default function DashboardPage() {
         api.get('/oil-changes/today-count'),
         api.get('/vehicles/count'),
         api.get('/oil-changes/monthly-revenue'),
-        api.get('/inventory/low-stock'),
+        api.get('/inventory/low-stock').catch((err) => {
+          console.error('Failed to fetch low stock:', err)
+          return { data: { data: [] } }
+        }),
         api.get('/oil-changes/recent?limit=5'),
         api.get('/payments/overdue'),
         api.get('/vehicles/active-services').catch(err => {
@@ -137,6 +142,7 @@ export default function DashboardPage() {
         <p className="text-muted-foreground mt-1">Xush kelibsiz, {user?.name}!</p>
       </div>
 
+      {can('ui.dashboard.stats_kpis') && (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         <StatCard
           title="Bugungi xizmatlar"
@@ -167,8 +173,10 @@ export default function DashboardPage() {
           isLoading={isLoading}
         />
       </div>
+      )}
 
       {/* Payment Tracking Stats */}
+      {can('ui.dashboard.stats_payments') && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card className="border-red-500">
           <CardContent className="pt-6">
@@ -245,9 +253,10 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Overdue Payments Alert */}
-      {!isLoading && overdueServices.length > 0 && (
+      {can('ui.dashboard.overdue_alert') && !isLoading && overdueServices.length > 0 && (
         <OverduePaymentsAlert
           overdueServices={overdueServices}
           totalOverdueAmount={overdueServices.reduce((sum, s) => sum + s.amountDue, 0)}
@@ -255,6 +264,7 @@ export default function DashboardPage() {
       )}
 
       {/* Active Services Alert */}
+      {can('ui.dashboard.active_services') && (
       <Card className="border-yellow-500 bg-yellow-50 dark:bg-yellow-950/20">
         <CardHeader>
           <div className="flex items-center gap-2">
@@ -343,7 +353,10 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
+      {can('ui.dashboard.charts') && (
+      <>
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardHeader>
@@ -418,7 +431,10 @@ export default function DashboardPage() {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+      </>
+      )}
 
+      {can('ui.dashboard.recent_services') && (
       <Card>
         <CardHeader>
           <CardTitle>So'nggi xizmatlar</CardTitle>
@@ -472,6 +488,7 @@ export default function DashboardPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Recent Payments Widget - Temporarily disabled until API is available */}
       {/* <Card>

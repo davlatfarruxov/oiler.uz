@@ -1,4 +1,4 @@
-import jwt from 'jsonwebtoken';
+import jwt, { type SignOptions } from 'jsonwebtoken';
 import { config } from '../config/env';
 import { UserRole } from '../types';
 
@@ -7,18 +7,16 @@ export interface TokenPayload {
   role: UserRole;
   tenantId: string;
   isTenantOwner: boolean;
+  /** Session / refresh rotation */
+  sid?: string;
 }
 
 export const generateAccessToken = (payload: TokenPayload): string => {
-  return jwt.sign(payload, config.jwtSecret, {
-    expiresIn: config.jwtExpire
-  });
+  return jwt.sign(payload, config.jwtSecret, { expiresIn: config.jwtExpire } as SignOptions);
 };
 
 export const generateRefreshToken = (payload: TokenPayload): string => {
-  return jwt.sign(payload, config.jwtRefreshSecret, {
-    expiresIn: config.jwtRefreshExpire
-  });
+  return jwt.sign(payload, config.jwtRefreshSecret, { expiresIn: config.jwtRefreshExpire } as SignOptions);
 };
 
 export const verifyAccessToken = (token: string): TokenPayload => {

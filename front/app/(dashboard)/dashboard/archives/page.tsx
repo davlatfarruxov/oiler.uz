@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
+import { useCanShowSection } from '@/lib/uiPermissions'
 import api from '@/lib/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -64,6 +65,7 @@ interface ArchivedEmployee {
 }
 
 export default function ArchivesPage() {
+  const can = useCanShowSection()
   const [vehicles, setVehicles] = useState<ArchivedVehicle[]>([])
   const [oilChanges, setOilChanges] = useState<ArchivedOilChange[]>([])
   const [employees, setEmployees] = useState<ArchivedEmployee[]>([])
@@ -214,6 +216,8 @@ export default function ArchivesPage() {
         </div>
       </div>
 
+      {can('ui.archives.main') ? (
+      <>
       {/* Summary Card */}
       <Card>
         <CardContent className="pt-6">
@@ -727,6 +731,14 @@ export default function ArchivesPage() {
           )}
         </DialogContent>
       </Dialog>
+      </>
+      ) : (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Arxiv bo‘limini ko‘rish uchun rolga UI ruxsati berilmagan.
+          </CardContent>
+        </Card>
+      )}
     </div>
   )
 }

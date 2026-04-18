@@ -1,4 +1,5 @@
 import { Request } from 'express';
+import type { PermissionKey } from '../constants/permissions';
 
 export enum UserRole {
   EMPLOYEE = 'employee',
@@ -41,7 +42,8 @@ export enum SubscriptionPlan {
 export interface IUser {
   _id: string;
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
   role: UserRole;
   isActive: boolean;
@@ -55,5 +57,9 @@ export interface AuthRequest extends Request {
     role: UserRole;
     tenantId: string;
     isTenantOwner: boolean;
+    permissions: PermissionKey[];
+    /** Route permission key matched for this request (authorize fallback) */
+    matchedRoutePermission?: PermissionKey | 'SKIP' | null;
+    accessSessionId?: string;
   };
 }

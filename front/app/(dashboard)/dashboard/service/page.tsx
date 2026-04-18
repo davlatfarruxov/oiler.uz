@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAppSelector } from '@/lib/store/hooks'
+import { canShowSection, useCanShowSection } from '@/lib/uiPermissions'
 import api from '@/lib/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,6 +45,11 @@ interface OilChange {
 
 export default function ServicePage() {
   const router = useRouter()
+  const permissions = useAppSelector((s) => s.auth.user?.permissions)
+  const can = useCanShowSection()
+  const showRecentTab = can('ui.service.tab_recent')
+  const showVehiclesTab = can('ui.service.tab_vehicles')
+  const defaultServiceTab = showRecentTab ? 'recent' : 'vehicles'
   const [plateNumber, setPlateNumber] = useState('')
   const [isSearching, setIsSearching] = useState(false)
   const [searchResult, setSearchResult] = useState<'found' | 'not-found' | null>(null)
@@ -89,6 +96,9 @@ export default function ServicePage() {
   }, [vehiclesPage])
 
   const loadServiceDetail = async (serviceId: string) => {
+    if (!canShowSection(permissions, 'ui.service.detail_modal')) {
+      return
+    }
     try {
       setLoadingServiceDetail(true)
       const response = await api.get(`/oil-changes/${serviceId}`)
@@ -316,6 +326,7 @@ export default function ServicePage() {
         <p className="text-muted-foreground mt-1">Mashinani qidiring va xizmatlarni boshqaring</p>
       </div>
 
+      {can('ui.service.plate_search') && (
       <Card>
         <CardHeader>
           <CardTitle>Mashinani topish</CardTitle>
@@ -366,13 +377,16 @@ export default function ServicePage() {
           )}
         </CardContent>
       </Card>
+      )}
 
-      <Tabs defaultValue="recent" className="space-y-4">
+      {(showRecentTab || showVehiclesTab) && (
+      <Tabs defaultValue={defaultServiceTab} className="space-y-4">
         <TabsList>
-          <TabsTrigger value="recent">Barcha xizmatlar</TabsTrigger>
-          <TabsTrigger value="vehicles">Barcha mashinalar</TabsTrigger>
+          {showRecentTab && <TabsTrigger value="recent">Barcha xizmatlar</TabsTrigger>}
+          {showVehiclesTab && <TabsTrigger value="vehicles">Barcha mashinalar</TabsTrigger>}
         </TabsList>
 
+        {showRecentTab && (
         <TabsContent value="recent">
           <Card>
             <CardHeader>
@@ -474,7 +488,9 @@ export default function ServicePage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
+        {showVehiclesTab && (
         <TabsContent value="vehicles">
           <Card>
             <CardHeader>
@@ -584,9 +600,12 @@ export default function ServicePage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
+      )}
 
       {/* Service Detail Modal */}
+      {can('ui.service.detail_modal') && (
       <Dialog open={showServiceDetail} onOpenChange={setShowServiceDetail}>
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -738,8 +757,10 @@ export default function ServicePage() {
           )}
         </DialogContent>
       </Dialog>
+      )}
 
       {/* History Dialog */}
+      {can('ui.service.detail_modal') && (
       <Dialog open={showHistory} onOpenChange={setShowHistory}>
         <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
           <DialogHeader>
@@ -854,6 +875,7 @@ export default function ServicePage() {
           )}
         </DialogContent>
       </Dialog>
+      )}
     </div>
   )
 }

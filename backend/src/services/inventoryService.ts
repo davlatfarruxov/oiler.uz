@@ -7,6 +7,8 @@ interface CreateInventoryData {
   name: string;
   stock: number;
   reorderLevel: number;
+  costPrice?: number;
+  costCurrency?: 'USD' | 'UZS';
   price: number;
 }
 

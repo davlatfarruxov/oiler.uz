@@ -4,13 +4,14 @@ import { UserRole } from '../types';
 
 export interface IUserDocument extends Document {
   name: string;
-  email: string;
+  email?: string;
+  phone?: string;
   password: string;
   role: UserRole;
   tenant: mongoose.Types.ObjectId;
+  assignedRole?: mongoose.Types.ObjectId;
   isTenantOwner: boolean;
   isActive: boolean;
-  // Notification Preferences
   emailNotifications: boolean;
   smsNotifications: boolean;
   lowStockAlerts: boolean;
@@ -29,10 +30,15 @@ const userSchema = new Schema<IUserDocument>(
     },
     email: {
       type: String,
-      required: [true, 'Email is required'],
       lowercase: true,
       trim: true,
+      sparse: true,
       match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email']
+    },
+    phone: {
+      type: String,
+      trim: true,
+      sparse: true
     },
     password: {
       type: String,
@@ -49,6 +55,11 @@ const userSchema = new Schema<IUserDocument>(
       type: Schema.Types.ObjectId,
       ref: 'Tenant',
       required: [true, 'Tenant is required'],
+      index: true
+    },
+    assignedRole: {
+      type: Schema.Types.ObjectId,
+      ref: 'Role',
       index: true
     },
     isTenantOwner: {
@@ -81,14 +92,26 @@ const userSchema = new Schema<IUserDocument>(
   }
 );
 
-// Compound unique index: email must be unique per tenant
-userSchema.index({ email: 1, tenant: 1 }, { unique: true });
+userSchema.index(
+  { email: 1, tenant: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { email: { $type: 'string', $exists: true, $gt: '' } }
+  }
+);
+userSchema.index(
+  { phone: 1 },
+  {
+    unique: true,
+    partialFilterExpression: { phone: { $type: 'string', $exists: true, $gt: '' } }
+  }
+);
 userSchema.index({ tenant: 1, role: 1 });
 userSchema.index({ tenant: 1, isActive: 1 });
 
 userSchema.pre('save', async function (next) {
   if (!this.isModified('password')) return next();
-  
+
   const salt = await bcrypt.genSalt(12);
   this.password = await bcrypt.hash(this.password, salt);
   next();

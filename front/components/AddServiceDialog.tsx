@@ -575,7 +575,6 @@ export function AddServiceDialog({
                   <EmployeeCommissionControl
                     employees={employees}
                     selectedEmployees={service.employees}
-                    totalServicePrice={calculateServiceTotal(service)}
                     laborCost={service.laborCost}
                     commissions={service.employeeCommissions || []}
                     onCommissionsChange={(commissions) => handleEmployeeCommissionsChange(serviceIndex, commissions)}

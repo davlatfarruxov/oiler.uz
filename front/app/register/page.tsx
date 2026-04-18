@@ -51,15 +51,17 @@ export default function RegisterPage() {
     }
 
     try {
-      await dispatch(register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        companyName: formData.companyName,
-        businessEmail: formData.businessEmail,
-        businessPhone: formData.businessPhone,
-        address: formData.address
-      })).unwrap();
+      await dispatch(
+        register({
+          name: formData.name,
+          email: formData.email,
+          password: formData.password,
+          companyName: formData.companyName,
+          businessEmail: formData.businessEmail || undefined,
+          businessPhone: formData.businessPhone || undefined,
+          address: formData.address || undefined
+        })
+      ).unwrap();
       router.push('/dashboard');
     } catch (err) {
       console.error('Registration failed:', err);
@@ -107,12 +109,12 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
+                <Label htmlFor="email">Email (kirish uchun)</Label>
                 <Input
                   id="email"
                   name="email"
                   type="email"
-                  placeholder="john@example.com"
+                  placeholder="siz@example.com"
                   value={formData.email}
                   onChange={handleChange}
                   required
@@ -164,7 +166,7 @@ export default function RegisterPage() {
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="businessEmail">Business Email</Label>
+                <Label htmlFor="businessEmail">Korxona email (ixtiyoriy)</Label>
                 <Input
                   id="businessEmail"
                   name="businessEmail"
@@ -172,20 +174,18 @@ export default function RegisterPage() {
                   placeholder="info@company.com"
                   value={formData.businessEmail}
                   onChange={handleChange}
-                  required
                   disabled={isLoading}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="businessPhone">Business Phone</Label>
+                <Label htmlFor="businessPhone">Korxona telefoni (ixtiyoriy)</Label>
                 <Input
                   id="businessPhone"
                   name="businessPhone"
                   type="tel"
-                  placeholder="+998 90 123 45 67"
+                  placeholder="+998901112233"
                   value={formData.businessPhone}
                   onChange={handleChange}
-                  required
                   disabled={isLoading}
                 />
               </div>

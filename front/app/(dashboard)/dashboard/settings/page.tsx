@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { useAppSelector } from '@/lib/store/hooks'
+import { canShowSection, useCanShowSection } from '@/lib/uiPermissions'
 import { useTenant } from '@/lib/contexts/TenantContext'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -15,6 +17,21 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 
 export default function SettingsPage() {
   const { tenant, isLoading: tenantLoading, updateTenant } = useTenant()
+  const permissions = useAppSelector((s) => s.auth.user?.permissions)
+  const can = useCanShowSection()
+  const showCompanyTab = can('ui.settings.tab_company')
+  const showSubscriptionTab = can('ui.settings.tab_subscription')
+  const showNotificationsTab = can('ui.settings.tab_notifications')
+  const showSecurityTab = can('ui.settings.tab_security')
+  const defaultSettingsTab = useMemo(() => {
+    if (canShowSection(permissions, 'ui.settings.tab_company')) return 'company'
+    if (canShowSection(permissions, 'ui.settings.tab_subscription')) return 'subscription'
+    if (canShowSection(permissions, 'ui.settings.tab_notifications')) return 'notifications'
+    if (canShowSection(permissions, 'ui.settings.tab_security')) return 'security'
+    return 'company'
+  }, [permissions])
+  const hasAnySettingsTab =
+    showCompanyTab || showSubscriptionTab || showNotificationsTab || showSecurityTab
   
   // Company Info State
   const [companyName, setCompanyName] = useState('')
@@ -130,27 +147,43 @@ export default function SettingsPage() {
       </div>
 
       {/* Settings Tabs */}
-      <Tabs defaultValue="company" className="space-y-4">
-        <TabsList>
+      {!hasAnySettingsTab ? (
+        <Card>
+          <CardContent className="py-10 text-center text-muted-foreground">
+            Sozlamalar bo‘limlarini ko‘rish uchun rolga tegishli UI ruxsatlari berilmagan.
+          </CardContent>
+        </Card>
+      ) : (
+      <Tabs defaultValue={defaultSettingsTab} className="space-y-4">
+        <TabsList className="flex flex-wrap h-auto gap-1">
+          {showCompanyTab && (
           <TabsTrigger value="company" className="gap-2">
             <Building2 className="w-4 h-4" />
             Kompaniya
           </TabsTrigger>
+          )}
+          {showSubscriptionTab && (
           <TabsTrigger value="subscription" className="gap-2">
             <CreditCard className="w-4 h-4" />
             Obuna
           </TabsTrigger>
+          )}
+          {showNotificationsTab && (
           <TabsTrigger value="notifications" className="gap-2">
             <Bell className="w-4 h-4" />
             Bildirishnomalar
           </TabsTrigger>
+          )}
+          {showSecurityTab && (
           <TabsTrigger value="security" className="gap-2">
             <Lock className="w-4 h-4" />
             Xavfsizlik
           </TabsTrigger>
+          )}
         </TabsList>
 
         {/* Company Settings */}
+        {showCompanyTab && (
         <TabsContent value="company" className="space-y-4">
           {saveMessage && (
             <Alert variant={saveMessage.type === 'error' ? 'destructive' : 'default'}>
@@ -282,8 +315,10 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Subscription Tab */}
+        {showSubscriptionTab && (
         <TabsContent value="subscription" className="space-y-4">
           <Card>
             <CardHeader>
@@ -342,8 +377,10 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Notifications Settings */}
+        {showNotificationsTab && (
         <TabsContent value="notifications" className="space-y-4">
           <Card>
             <CardHeader>
@@ -387,8 +424,10 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
 
         {/* Security Settings */}
+        {showSecurityTab && (
         <TabsContent value="security" className="space-y-4">
           <Card>
             <CardHeader>
@@ -441,7 +480,9 @@ export default function SettingsPage() {
             </CardContent>
           </Card>
         </TabsContent>
+        )}
       </Tabs>
+      )}
     </div>
   )
 }

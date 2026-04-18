@@ -18,7 +18,7 @@ export default function LoginPage() {
   const { isLoading, error, user } = useAppSelector((state) => state.auth);
 
   const [formData, setFormData] = useState({
-    email: '',
+    identifier: '',
     password: ''
   });
 
@@ -49,9 +49,9 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">Welcome back</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center">Kirish</CardTitle>
           <CardDescription className="text-center">
-            Sign in to your Oiler account
+            Kompaniya egasi — email; xodim / qo‘shimcha admin — telefon raqam
           </CardDescription>
         </CardHeader>
         <form onSubmit={handleSubmit}>
@@ -62,20 +62,21 @@ export default function LoginPage() {
               </Alert>
             )}
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
+              <Label htmlFor="identifier">Email yoki telefon</Label>
               <Input
-                id="email"
-                name="email"
-                type="email"
-                placeholder="name@example.com"
-                value={formData.email}
+                id="identifier"
+                name="identifier"
+                type="text"
+                placeholder="siz@example.com yoki +998901234567"
+                value={formData.identifier}
                 onChange={handleChange}
                 required
                 disabled={isLoading}
+                autoComplete="username"
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
+              <Label htmlFor="password">Parol</Label>
               <Input
                 id="password"
                 name="password"
@@ -85,6 +86,7 @@ export default function LoginPage() {
                 onChange={handleChange}
                 required
                 disabled={isLoading}
+                autoComplete="current-password"
               />
             </div>
           </CardContent>
@@ -93,16 +95,16 @@ export default function LoginPage() {
               {isLoading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Signing in...
+                  Kirilmoqda...
                 </>
               ) : (
-                'Sign in'
+                'Kirish'
               )}
             </Button>
             <p className="text-sm text-center text-muted-foreground">
-              Don't have an account?{' '}
+              Akkaunt yo‘qmi?{' '}
               <Link href="/register" className="text-primary hover:underline font-medium">
-                Register here
+                Ro‘yxatdan o‘tish (kompaniya)
               </Link>
             </p>
           </CardFooter>

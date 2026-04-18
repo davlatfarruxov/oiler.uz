@@ -557,6 +557,7 @@ export class VehicleService {
 
       return {
         id: change._id,
+        publicUuid: change.publicUuid,
         type: 'oilChange',
         date: change.createdAt,
         serviceName: 'Oil Change',
@@ -581,6 +582,7 @@ export class VehicleService {
     // Map services to unified format
     const serviceHistory = services.map((service: any) => ({
       id: service._id,
+      publicUuid: service.publicUuid,
       type: 'service',
       date: service.createdAt,
       status: service.status, // Add status field

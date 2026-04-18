@@ -846,8 +846,15 @@ export default function EmployeeDetailPage() {
                                           (typeof e === 'string' ? e : e._id?.toString()) === params.id
                                         ))
                                         .map((s: any, idx: number) => {
-                                          const employeeCount = s.employees.length;
-                                          const employeeCommission = (s.totalPrice * (service.commissionRate || 30) / 100) / employeeCount;
+                                          const employeeCommissionRecord = (s.employeeCommissions || []).find((commission: any) => {
+                                            const employeeCommissionId =
+                                              typeof commission.employee === 'string'
+                                                ? commission.employee
+                                                : commission.employee?._id?.toString?.() || commission.employee?.toString?.();
+                                            return employeeCommissionId === params.id;
+                                          });
+                                          const employeeCommission = employeeCommissionRecord?.commissionAmount || 0;
+                                          const employeeCommissionRate = employeeCommissionRecord?.commissionRate || 0;
                                           
                                           return (
                                             <div key={idx} className="flex justify-between items-center bg-background dark:bg-card p-3 rounded border border-border">
@@ -859,7 +866,7 @@ export default function EmployeeDetailPage() {
                                                   {Math.round(employeeCommission).toLocaleString()} so'm
                                                 </p>
                                                 <p className="text-xs text-muted-foreground">
-                                                  Komissiya ({service.commissionRate || 30}%)
+                                                  Komissiya ({employeeCommissionRate}%)
                                                 </p>
                                               </div>
                                             </div>

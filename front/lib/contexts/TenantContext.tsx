@@ -41,9 +41,10 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true);
       const response = await api.get('/auth/profile');
-      if (response.data.data.tenant) {
-        setTenant(response.data.data.tenant);
-        localStorage.setItem('tenant', JSON.stringify(response.data.data.tenant));
+      const body = response.data?.data as { tenant?: Tenant } | undefined;
+      if (body?.tenant) {
+        setTenant(body.tenant);
+        localStorage.setItem('tenant', JSON.stringify(body.tenant));
       }
     } catch (error) {
       console.error('Failed to refresh tenant:', error);

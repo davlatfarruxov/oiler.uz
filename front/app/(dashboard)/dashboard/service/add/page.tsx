@@ -87,7 +87,7 @@ export default function AddVehiclePage() {
       setIsSaving(true)
       const response = await api.post('/vehicles', formData)
       alert('Vehicle added successfully!')
-      router.push(`/dashboard/service/${response.data.data._id}`)
+      router.push(`/dashboard/service/${response.data.data._id}?from=register`)
     } catch (error: any) {
       alert(error.response?.data?.message || 'Failed to add vehicle')
     } finally {

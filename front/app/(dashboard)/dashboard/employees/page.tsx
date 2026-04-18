@@ -3,6 +3,7 @@
 import React from "react"
 
 import { useState, useEffect } from 'react'
+import { useCanShowSection } from '@/lib/uiPermissions'
 import api from '@/lib/api/axios'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -14,6 +15,7 @@ import { Slider } from '@/components/ui/slider'
 import { AlertCircle, Plus, TrendingUp, Loader2, DollarSign } from 'lucide-react'
 
 export default function EmployeesPage() {
+  const can = useCanShowSection()
   const [employees, setEmployees] = useState<any[]>([])
   const [stats, setStats] = useState<any>(null)
   const [openDialog, setOpenDialog] = useState(false)
@@ -122,6 +124,7 @@ export default function EmployeesPage() {
           <h1 className="text-3xl font-bold text-foreground">Xodimlar</h1>
           <p className="text-muted-foreground mt-1">Jamoa a'zolarini boshqarish va ish faoliyatini kuzatish</p>
         </div>
+        {can('ui.employees.header_add') && (
         <Button
           onClick={() => {
             setEditingEmployee(null)
@@ -133,9 +136,11 @@ export default function EmployeesPage() {
           <Plus className="w-4 h-4" />
           Xodim qo'shish
         </Button>
+        )}
       </div>
 
       {/* Summary Cards */}
+      {can('ui.employees.stats') && (
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <Card>
           <CardContent className="pt-6">
@@ -200,8 +205,10 @@ export default function EmployeesPage() {
           </CardContent>
         </Card>
       </div>
+      )}
 
       {/* Employees Table */}
+      {can('ui.employees.table') && (
       <Card>
         <CardHeader>
           <CardTitle>Xodimlar ish faoliyati</CardTitle>
@@ -299,9 +306,10 @@ export default function EmployeesPage() {
           )}
         </CardContent>
       </Card>
+      )}
 
       {/* Top Performer */}
-      {topPerformer && topPerformer.servicesThisMonth > 0 && (
+      {can('ui.employees.stats') && topPerformer && topPerformer.servicesThisMonth > 0 && (
         <Card className="border-primary/50 bg-primary/5">
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
@@ -320,6 +328,7 @@ export default function EmployeesPage() {
       )}
 
       {/* Add/Edit Employee Dialog */}
+      {(can('ui.employees.header_add') || can('ui.employees.table')) && (
       <Dialog open={openDialog} onOpenChange={setOpenDialog}>
         <DialogContent className="max-w-md">
           <DialogHeader>
@@ -395,6 +404,7 @@ export default function EmployeesPage() {
           </form>
         </DialogContent>
       </Dialog>
+      )}
     </div>
   )
 }
