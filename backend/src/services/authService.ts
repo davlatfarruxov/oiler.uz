@@ -140,6 +140,9 @@ export class AuthService {
       tenant: {
         id: tenant._id.toString(),
         companyName: tenant.companyName,
+        businessEmail: tenant.businessEmail || '',
+        businessPhone: tenant.businessPhone || '',
+        address: tenant.address || '',
         plan: tenant.plan,
         isActive: tenant.isActive
       },
@@ -220,6 +223,9 @@ export class AuthService {
       tenant: {
         id: tenant._id.toString(),
         companyName: tenant.companyName,
+        businessEmail: tenant.businessEmail || '',
+        businessPhone: tenant.businessPhone || '',
+        address: tenant.address || '',
         plan: tenant.plan,
         isActive: tenant.isActive
       },
@@ -309,7 +315,7 @@ export class AuthService {
 
   async getProfilePayload(
     userId: string
-  ): Promise<{ user: AuthUserPayload; tenant: { id: string; companyName: string; plan: string; isActive: boolean; businessEmail?: string; businessPhone?: string } }> {
+  ): Promise<{ user: AuthUserPayload; tenant: { id: string; companyName: string; plan: string; isActive: boolean; businessEmail?: string; businessPhone?: string; address?: string } }> {
     const user = await User.findById(userId).populate('tenant').populate('assignedRole');
     if (!user) {
       throw new ApiError(404, 'User not found');
@@ -322,8 +328,9 @@ export class AuthService {
       companyName: t.companyName,
       plan: t.plan,
       isActive: t.isActive,
-      businessEmail: t.businessEmail,
-      businessPhone: t.businessPhone
+      businessEmail: t.businessEmail || '',
+      businessPhone: t.businessPhone || '',
+      address: t.address || ''
     };
     return { user: u, tenant };
   }

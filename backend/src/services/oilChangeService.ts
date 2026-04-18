@@ -275,16 +275,16 @@ export class OilChangeService {
       .populate('employeeCommissions.employee', 'name')
       .populate({
         path: 'oilProduct',
-        select: 'brand viscosity apiGrade volume',
+        select: 'brand viscosity apiGrade volume price',
         populate: {
           path: 'brand',
           select: 'name'
         }
       })
-      .populate('oilFilter', 'brandName partNumber')
-      .populate('airFilter', 'brandName partNumber')
-      .populate('cabinFilter', 'brandName partNumber')
-      .populate('fuelFilter', 'brandName partNumber')
+      .populate('oilFilter', 'brandName partNumber price')
+      .populate('airFilter', 'brandName partNumber price')
+      .populate('cabinFilter', 'brandName partNumber price')
+      .populate('fuelFilter', 'brandName partNumber price')
       .populate('additionalProducts.product')
       .lean();
     
@@ -312,16 +312,16 @@ export class OilChangeService {
       .populate('employees', 'name')
       .populate({
         path: 'oilProduct',
-        select: 'brand viscosity apiGrade volume',
+        select: 'brand viscosity apiGrade volume price',
         populate: {
           path: 'brand',
           select: 'name'
         }
       })
-      .populate('oilFilter', 'brandName partNumber')
-      .populate('airFilter', 'brandName partNumber')
-      .populate('cabinFilter', 'brandName partNumber')
-      .populate('fuelFilter', 'brandName partNumber')
+      .populate('oilFilter', 'brandName partNumber price')
+      .populate('airFilter', 'brandName partNumber price')
+      .populate('cabinFilter', 'brandName partNumber price')
+      .populate('fuelFilter', 'brandName partNumber price')
       .lean();
     
     if (!oilChange) {

@@ -46,6 +46,14 @@ function paymentLabel(status: string) {
   return "To'lanmagan"
 }
 
+function pickMoney(...vals: any[]): number | null {
+  for (const v of vals) {
+    const n = Number(v)
+    if (Number.isFinite(n) && n > 0) return n
+  }
+  return null
+}
+
 export function ServicePrintReceipt({
   vehicle,
   tenant,
@@ -70,6 +78,14 @@ export function ServicePrintReceipt({
   const customer = vehicle?.customer || lastServiceData?.customer
   const custName = typeof customer === 'object' ? customer?.name : '—'
   const custPhone = typeof customer === 'object' ? customer?.phone : '—'
+  const oilUnitPrice = pickMoney(lastServiceData?.oilProduct?.price, lastServiceData?.oilPrice)
+  const oilVolume = Number(lastServiceData?.oilProduct?.volume) || 0
+  const oilQty = Number(lastServiceData?.oilQuantityUsed) || 0
+  const oilLineTotal =
+    pickMoney(lastServiceData?.oilTotalPrice, lastServiceData?.oilAmount) ??
+    (oilUnitPrice && oilQty > 0
+      ? (oilVolume > 0 ? (oilUnitPrice / oilVolume) * oilQty : oilUnitPrice * oilQty)
+      : null)
 
   return (
     <>
@@ -101,6 +117,23 @@ export function ServicePrintReceipt({
               -webkit-print-color-adjust: exact !important;
               print-color-adjust: exact !important;
               font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif !important;
+            }
+            /* Barcha elementlar oq-qora printer uchun monoxrom */
+            .service-print-surface * {
+              color: #000000 !important;
+              border-color: #000000 !important;
+              background: transparent !important;
+              box-shadow: none !important;
+              text-shadow: none !important;
+            }
+            .service-print-surface {
+              background: #ffffff !important;
+            }
+            .service-print-surface table thead {
+              background: #ffffff !important;
+            }
+            .service-print-surface img {
+              filter: grayscale(100%) contrast(120%) !important;
             }
             .service-print-receipt {
               font-size: 9.75pt !important;
@@ -290,7 +323,9 @@ export function ServicePrintReceipt({
                               ` · ${lastServiceData.oilQuantityUsed} L`}
                           </div>
                         </td>
-                        <td className="px-2 py-1 text-right text-slate-500">—</td>
+                        <td className="px-2 py-1 text-right">
+                          {oilLineTotal != null ? formatUZS(oilLineTotal) : '—'}
+                        </td>
                       </tr>
                     )}
                     {lastServiceData.oilFilter && (
@@ -304,8 +339,18 @@ export function ServicePrintReceipt({
                           </div>
                         </td>
                         <td className="px-2 py-1 text-right">
-                          {lastServiceData.oilFilter.price != null
-                            ? formatUZS(lastServiceData.oilFilter.price)
+                          {pickMoney(
+                            lastServiceData.oilFilter?.price,
+                            lastServiceData.oilFilter?.salePrice,
+                            lastServiceData.oilFilter?.sellingPrice
+                          ) != null
+                            ? formatUZS(
+                                pickMoney(
+                                  lastServiceData.oilFilter?.price,
+                                  lastServiceData.oilFilter?.salePrice,
+                                  lastServiceData.oilFilter?.sellingPrice
+                                ) as number
+                              )
                             : '—'}
                         </td>
                       </tr>
@@ -321,8 +366,18 @@ export function ServicePrintReceipt({
                           </div>
                         </td>
                         <td className="px-2 py-1 text-right">
-                          {lastServiceData.airFilter.price != null
-                            ? formatUZS(lastServiceData.airFilter.price)
+                          {pickMoney(
+                            lastServiceData.airFilter?.price,
+                            lastServiceData.airFilter?.salePrice,
+                            lastServiceData.airFilter?.sellingPrice
+                          ) != null
+                            ? formatUZS(
+                                pickMoney(
+                                  lastServiceData.airFilter?.price,
+                                  lastServiceData.airFilter?.salePrice,
+                                  lastServiceData.airFilter?.sellingPrice
+                                ) as number
+                              )
                             : '—'}
                         </td>
                       </tr>
@@ -338,8 +393,18 @@ export function ServicePrintReceipt({
                           </div>
                         </td>
                         <td className="px-2 py-1 text-right">
-                          {lastServiceData.cabinFilter.price != null
-                            ? formatUZS(lastServiceData.cabinFilter.price)
+                          {pickMoney(
+                            lastServiceData.cabinFilter?.price,
+                            lastServiceData.cabinFilter?.salePrice,
+                            lastServiceData.cabinFilter?.sellingPrice
+                          ) != null
+                            ? formatUZS(
+                                pickMoney(
+                                  lastServiceData.cabinFilter?.price,
+                                  lastServiceData.cabinFilter?.salePrice,
+                                  lastServiceData.cabinFilter?.sellingPrice
+                                ) as number
+                              )
                             : '—'}
                         </td>
                       </tr>
@@ -355,8 +420,18 @@ export function ServicePrintReceipt({
                           </div>
                         </td>
                         <td className="px-2 py-1 text-right">
-                          {lastServiceData.fuelFilter.price != null
-                            ? formatUZS(lastServiceData.fuelFilter.price)
+                          {pickMoney(
+                            lastServiceData.fuelFilter?.price,
+                            lastServiceData.fuelFilter?.salePrice,
+                            lastServiceData.fuelFilter?.sellingPrice
+                          ) != null
+                            ? formatUZS(
+                                pickMoney(
+                                  lastServiceData.fuelFilter?.price,
+                                  lastServiceData.fuelFilter?.salePrice,
+                                  lastServiceData.fuelFilter?.sellingPrice
+                                ) as number
+                              )
                             : '—'}
                         </td>
                       </tr>

@@ -33,7 +33,8 @@ export function TenantProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (authTenant) {
-      setTenant(authTenant);
+      // authTenant ba'zan partial bo'lishi mumkin; oldingi qiymatlarni yo'qotmaslik uchun merge qilamiz.
+      setTenant((prev) => ({ ...(prev || {}), ...authTenant } as Tenant));
     }
   }, [authTenant]);
 
