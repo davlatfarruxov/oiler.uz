@@ -64,6 +64,9 @@ export function ServicePrintReceipt({
 }: ServicePrintReceiptProps) {
   if (!lastServiceData) return null
 
+  const pageSize = printType === 'sticker' ? '58mm 40mm' : 'A4 portrait'
+  const pageMargin = printType === 'sticker' ? '0' : '7mm'
+
   const companyName = companySettings?.companyName || tenant?.companyName || 'OILER.UZ'
   const companyPhone =
     companySettings?.businessPhone || companySettings?.companyPhone || tenant?.businessPhone || ''
@@ -85,6 +88,32 @@ export function ServicePrintReceipt({
     (oilUnitPrice && oilQty > 0
       ? (oilVolume > 0 ? (oilUnitPrice / oilVolume) * oilQty : oilUnitPrice * oilQty)
       : null)
+  const stickerDate = (() => {
+    const raw = lastServiceData.createdAt || lastServiceData.date
+    if (!raw) return '—'
+    try {
+      return new Date(raw).toLocaleDateString('en-US')
+    } catch {
+      return '—'
+    }
+  })()
+  const stickerOil = (() => {
+    if (lastServiceData.oilProductCustomerProvided || lastServiceData.oilProductCustomerProvidedDetails) {
+      return lastServiceData.oilProductCustomerProvidedDetails || 'Mijoz moyi'
+    }
+    const oil = lastServiceData.oilProduct
+    if (!oil) return lastServiceData.oilProductName || '—'
+    const oilName = `${oil.brand || ''} ${oil.viscosity || ''} ${oil.apiGrade || ''}`.trim()
+    const qty = lastServiceData.oilQuantityUsed ? ` (${lastServiceData.oilQuantityUsed}L)` : ''
+    return `${oilName}${qty}`.trim()
+  })()
+  const stickerFilter = (() => {
+    return 'Moy ✓'
+  })()
+  const stickerEmployee =
+    lastServiceData.employees?.length > 0
+      ? lastServiceData.employees.map((e: any) => employeeLabel(e)).join(', ')
+      : '—'
 
   return (
     <>
@@ -93,8 +122,8 @@ export function ServicePrintReceipt({
           __html: `
           @media print {
             @page {
-              size: A4 portrait;
-              margin: 7mm;
+              size: ${pageSize};
+              margin: ${pageMargin};
             }
             body * {
               visibility: hidden !important;
@@ -134,6 +163,17 @@ export function ServicePrintReceipt({
             .service-print-surface img {
               filter: grayscale(100%) contrast(120%) !important;
             }
+            .service-print-sticker {
+              background: #ffffff !important;
+              color: #000000 !important;
+              border: none !important;
+            }
+            .service-print-sticker * {
+              color: #000000 !important;
+            }
+            .service-print-sticker img {
+              filter: none !important;
+            }
             .service-print-receipt {
               font-size: 9.75pt !important;
               line-height: 1.28 !important;
@@ -153,35 +193,58 @@ export function ServicePrintReceipt({
       <div className="service-print-surface hidden print:block">
         {printType === 'sticker' ? (
           <div
-            className="mx-auto border-2 border-black text-black"
-            style={{ width: '58mm', height: '40mm', padding: '2mm', boxSizing: 'border-box', fontSize: '9px' }}
+            className="service-print-sticker mx-auto text-white"
+            style={{
+              width: '58mm',
+              height: '40mm',
+              padding: '1.2mm 1.3mm',
+              boxSizing: 'border-box',
+              fontSize: '3.9px',
+              backgroundColor: '#ffffff',
+              color: '#000000',
+              lineHeight: 1.02,
+              fontWeight: 700
+            }}
           >
-            <div className="text-center font-bold" style={{ fontSize: '11px' }}>
+            <div className="text-center font-extrabold" style={{ fontSize: '4.5mm', lineHeight: 1 }}>
               {companyName}
             </div>
-            <div className="text-center" style={{ fontSize: '8px' }}>
+            <div className="text-center mt-0.5" style={{ fontSize: '3.5mm' }}>
               {companyPhone}
             </div>
             <div className="mt-1 space-y-0.5">
-              <div>
-                <strong>Hozirgi:</strong> {(lastServiceData.mileage || 0).toLocaleString()} km
+              <div style={{ fontSize: '3.5mm' }}>
+                Hozirgi: {(lastServiceData.mileage || 0).toLocaleString()} km
               </div>
               {lastServiceData.nextServiceMileage != null && (
-                <div>
-                  <strong>Keyingi:</strong>{' '}
-                  {Number(lastServiceData.nextServiceMileage).toLocaleString()} km
+                <div style={{ fontSize: '3.5mm' }}>
+                  Keyingi: {Number(lastServiceData.nextServiceMileage).toLocaleString()} km
                 </div>
               )}
-              <div>
-                <strong>Sana:</strong>{' '}
-                {formatDateTime(lastServiceData.createdAt || lastServiceData.date)}
+              <div style={{ fontSize: '3.5mm' }}>Sana: {stickerDate}</div>
+            </div>
+            <div className="mt-1 flex items-end justify-between gap-1">
+              <div className="min-w-0 flex-1 space-y-0.5" style={{ fontSize: '3.2mm', lineHeight: 1.05 }}>
+                <div className="truncate">Moy: {stickerOil}</div>
+                <div className="truncate">Filterlar: {stickerFilter}</div>
+                <div className="truncate">Xodim: {stickerEmployee}</div>
+              </div>
+              <div
+                style={{
+                  width: '13mm',
+                  height: '13mm',
+                  backgroundColor: '#ffffff',
+                  padding: '0.4mm',
+                  boxSizing: 'border-box',
+                  flexShrink: 0,
+                  transform: 'translateY(-13mm)'
+                }}
+              >
+                {qrCodeDataUrl && (
+                  <img src={qrCodeDataUrl} alt="QR" style={{ width: '100%', height: '100%', display: 'block' }} />
+                )}
               </div>
             </div>
-            {qrCodeDataUrl && (
-              <div className="flex justify-center mt-1">
-                <img src={qrCodeDataUrl} alt="QR" style={{ width: 44, height: 44 }} />
-              </div>
-            )}
           </div>
         ) : (
           <div className="service-print-receipt text-slate-900 text-[11px] leading-snug max-w-[196mm] mx-auto">
