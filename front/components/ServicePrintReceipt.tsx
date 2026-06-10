@@ -512,6 +512,18 @@ export function ServicePrintReceipt({
                         <td className="px-2 py-1 text-right">{formatUZS(ap.price)}</td>
                       </tr>
                     ))}
+                    {lastServiceData.customProducts?.map((cp: any, i: number) => (
+                      <tr key={`cp-${i}`} className="border-t border-slate-200">
+                        <td className="px-2 py-1">
+                          <div className="font-medium">Qo&apos;shimcha</div>
+                          <div className="text-[9px] text-slate-600 leading-tight">
+                            {cp?.name || 'Mahsulot'}
+                            {cp?.quantity != null ? ` × ${cp.quantity}` : ''}
+                          </div>
+                        </td>
+                        <td className="px-2 py-1 text-right">{formatUZS(cp?.price)}</td>
+                      </tr>
+                    ))}
                     {lastServiceData.laborCost > 0 && (
                       <tr className="border-t border-slate-200">
                         <td className="px-2 py-1 font-medium">Ish haqi</td>

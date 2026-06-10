@@ -15,6 +15,12 @@ export interface IAdditionalProduct {
   price: number;
 }
 
+export interface ICustomProduct {
+  name: string;
+  quantity: number;
+  price: number;
+}
+
 export interface IOilChangeDocument extends Document {
   tenant: mongoose.Types.ObjectId;
   publicUuid: string; // Public UUID for QR codes
@@ -43,6 +49,7 @@ export interface IOilChangeDocument extends Document {
   fuelFilterCustomerProvided: boolean;
   fuelFilterCustomerProvidedDetails?: string;
   additionalProducts: IAdditionalProduct[];
+  customProducts: ICustomProduct[];
   mileage: number;
   nextServiceMileage: number;
   laborCost: number;
@@ -100,6 +107,25 @@ const additionalProductSchema = new Schema({
     type: Number,
     required: true,
     min: 1
+  },
+  price: {
+    type: Number,
+    required: true,
+    min: 0
+  }
+}, { _id: false });
+
+const customProductSchema = new Schema({
+  name: {
+    type: String,
+    required: true,
+    trim: true
+  },
+  quantity: {
+    type: Number,
+    required: true,
+    min: 1,
+    default: 1
   },
   price: {
     type: Number,
@@ -215,6 +241,10 @@ const oilChangeSchema = new Schema<IOilChangeDocument>(
       trim: true
     },
     additionalProducts: [additionalProductSchema],
+    customProducts: {
+      type: [customProductSchema],
+      default: []
+    },
     mileage: {
       type: Number,
       required: [true, 'Mileage is required'],

@@ -21,7 +21,17 @@ interface CreateOilChangeData {
   oilFilterId?: string;
   oilFilterCustomerProvided?: boolean;
   oilFilterCustomerProvidedDetails?: string;
+  airFilterId?: string;
+  airFilterCustomerProvided?: boolean;
+  airFilterCustomerProvidedDetails?: string;
+  cabinFilterId?: string;
+  cabinFilterCustomerProvided?: boolean;
+  cabinFilterCustomerProvidedDetails?: string;
+  fuelFilterId?: string;
+  fuelFilterCustomerProvided?: boolean;
+  fuelFilterCustomerProvidedDetails?: string;
   additionalProducts?: { productId: string; quantity: number }[];
+  customProducts?: { name: string; quantity?: number; price: number }[];
   mileage: number;
   nextServiceMileage: number;
   laborCost?: number;
@@ -71,19 +81,42 @@ export class OilChangeService {
       await oilProduct.save();
     }
 
-    let oilFilter = null;
-    // Only fetch and decrease stock if NOT customer provided
-    if (!data.oilFilterCustomerProvided) {
-      if (!data.oilFilterId) {
-        throw new ApiError(400, 'Oil filter is required');
-      }
-      oilFilter = await Filter.findOne({ _id: data.oilFilterId, tenant: tenantId });
+    // Optional oil filter: decrease stock only when selected from inventory
+    if (!data.oilFilterCustomerProvided && data.oilFilterId) {
+      const oilFilter = await Filter.findOne({ _id: data.oilFilterId, tenant: tenantId });
       if (!oilFilter) {
         throw new ApiError(404, 'Oil filter not found');
       }
       // Decrease oil filter stock
       oilFilter.stock -= 1;
       await oilFilter.save();
+    }
+
+    if (!data.airFilterCustomerProvided && data.airFilterId) {
+      const airFilter = await Filter.findOne({ _id: data.airFilterId, tenant: tenantId });
+      if (!airFilter) {
+        throw new ApiError(404, 'Air filter not found');
+      }
+      airFilter.stock -= 1;
+      await airFilter.save();
+    }
+
+    if (!data.cabinFilterCustomerProvided && data.cabinFilterId) {
+      const cabinFilter = await Filter.findOne({ _id: data.cabinFilterId, tenant: tenantId });
+      if (!cabinFilter) {
+        throw new ApiError(404, 'Cabin filter not found');
+      }
+      cabinFilter.stock -= 1;
+      await cabinFilter.save();
+    }
+
+    if (!data.fuelFilterCustomerProvided && data.fuelFilterId) {
+      const fuelFilter = await Filter.findOne({ _id: data.fuelFilterId, tenant: tenantId });
+      if (!fuelFilter) {
+        throw new ApiError(404, 'Fuel filter not found');
+      }
+      fuelFilter.stock -= 1;
+      await fuelFilter.save();
     }
 
     // Prepare additional products
@@ -103,6 +136,14 @@ export class OilChangeService {
         }
       }
     }
+
+    const customProducts = (data.customProducts || [])
+      .filter((item: any) => item?.name && Number(item?.price) > 0)
+      .map((item: any) => ({
+        name: String(item.name).trim(),
+        quantity: Number(item.quantity) > 0 ? Number(item.quantity) : 1,
+        price: Number(item.price)
+      }));
 
     // Calculate employee commissions
     const laborCost = data.laborCost || 0;
@@ -142,7 +183,17 @@ export class OilChangeService {
       oilFilter: data.oilFilterId || undefined,
       oilFilterCustomerProvided: data.oilFilterCustomerProvided || false,
       oilFilterCustomerProvidedDetails: data.oilFilterCustomerProvidedDetails,
+      airFilter: data.airFilterId || undefined,
+      airFilterCustomerProvided: data.airFilterCustomerProvided || false,
+      airFilterCustomerProvidedDetails: data.airFilterCustomerProvidedDetails,
+      cabinFilter: data.cabinFilterId || undefined,
+      cabinFilterCustomerProvided: data.cabinFilterCustomerProvided || false,
+      cabinFilterCustomerProvidedDetails: data.cabinFilterCustomerProvidedDetails,
+      fuelFilter: data.fuelFilterId || undefined,
+      fuelFilterCustomerProvided: data.fuelFilterCustomerProvided || false,
+      fuelFilterCustomerProvidedDetails: data.fuelFilterCustomerProvidedDetails,
       additionalProducts,
+      customProducts,
       mileage: data.mileage,
       nextServiceMileage: data.nextServiceMileage,
       laborCost: laborCost,
@@ -158,7 +209,18 @@ export class OilChangeService {
     // Update customer total debt
     await this.updateCustomerDebt(tenantId, data.customerId);
 
-    return oilChange.populate(['vehicle', 'customer', 'employees', 'employeeCommissions.employee', 'oilProduct', 'oilFilter']);
+    return oilChange.populate([
+      'vehicle',
+      'customer',
+      'employees',
+      'employeeCommissions.employee',
+      'oilProduct',
+      'oilFilter',
+      'airFilter',
+      'cabinFilter',
+      'fuelFilter',
+      'additionalProducts.product'
+    ]);
   }
 
   /**
@@ -357,6 +419,8 @@ export class OilChangeService {
       fuelFilter: oilChange.fuelFilter,
       fuelFilterCustomerProvided: oilChange.fuelFilterCustomerProvided,
       fuelFilterCustomerProvidedDetails: oilChange.fuelFilterCustomerProvidedDetails,
+      additionalProducts: oilChange.additionalProducts,
+      customProducts: oilChange.customProducts,
       mileage: oilChange.mileage,
       nextServiceMileage: oilChange.nextServiceMileage,
       createdAt: oilChange.createdAt
@@ -610,6 +674,98 @@ export class OilChangeService {
         });
         
         oilChange.employeeCommissions = data.employeeCommissions as any;
+      }
+    }
+
+    // Update additional products if changed
+    if (data.additionalProducts && Array.isArray(data.additionalProducts)) {
+      const incoming = data.additionalProducts
+        .filter((ap: any) => ap?.productId)
+        .map((ap: any) => ({
+          productId: String(ap.productId),
+          quantity: Number(ap.quantity) > 0 ? Number(ap.quantity) : 1
+        }));
+
+      const oldList = (oilChange.additionalProducts || []).map((ap: any) => ({
+        productId: String(ap.product),
+        quantity: Number(ap.quantity) || 1
+      }));
+
+      const normalize = (arr: Array<{ productId: string; quantity: number }>) =>
+        arr
+          .slice()
+          .sort((a, b) => a.productId.localeCompare(b.productId))
+          .map((x) => `${x.productId}:${x.quantity}`)
+          .join('|');
+
+      if (normalize(oldList) !== normalize(incoming)) {
+        // Return old additional products to stock
+        for (const oldItem of oldList) {
+          const inv = await Inventory.findOne({ _id: oldItem.productId, tenant: tenantId });
+          if (inv) {
+            inv.stock += oldItem.quantity;
+            await inv.save();
+          }
+        }
+
+        const nextAdditionalProducts: Array<{ product: any; quantity: number; price: number }> = [];
+        for (const newItem of incoming) {
+          const inv = await Inventory.findOne({ _id: newItem.productId, tenant: tenantId });
+          if (!inv) {
+            throw new ApiError(404, 'Additional product not found');
+          }
+          if ((inv.stock || 0) < newItem.quantity) {
+            throw new ApiError(400, `${inv.name || 'Additional product'} stock yetarli emas`);
+          }
+          inv.stock -= newItem.quantity;
+          await inv.save();
+
+          nextAdditionalProducts.push({
+            product: inv._id,
+            quantity: newItem.quantity,
+            price: (inv.price || 0) * newItem.quantity
+          });
+        }
+
+        changes.push({
+          field: 'additionalProducts',
+          oldValue: oldList,
+          newValue: incoming
+        });
+
+        oilChange.additionalProducts = nextAdditionalProducts as any;
+      }
+    }
+
+    if (data.customProducts && Array.isArray(data.customProducts)) {
+      const incomingCustom = data.customProducts
+        .filter((cp: any) => cp?.name && Number(cp?.price) > 0)
+        .map((cp: any) => ({
+          name: String(cp.name).trim(),
+          quantity: Number(cp.quantity) > 0 ? Number(cp.quantity) : 1,
+          price: Number(cp.price)
+        }));
+
+      const oldCustom = (oilChange.customProducts || []).map((cp: any) => ({
+        name: String(cp.name || '').trim(),
+        quantity: Number(cp.quantity) || 1,
+        price: Number(cp.price) || 0
+      }));
+
+      const normalizeCustom = (arr: Array<{ name: string; quantity: number; price: number }>) =>
+        arr
+          .slice()
+          .sort((a, b) => `${a.name}:${a.price}`.localeCompare(`${b.name}:${b.price}`))
+          .map((x) => `${x.name}:${x.quantity}:${x.price}`)
+          .join('|');
+
+      if (normalizeCustom(oldCustom) !== normalizeCustom(incomingCustom)) {
+        changes.push({
+          field: 'customProducts',
+          oldValue: oldCustom,
+          newValue: incomingCustom
+        });
+        oilChange.customProducts = incomingCustom as any;
       }
     }
     
@@ -978,6 +1134,12 @@ export class OilChangeService {
       if (oilChange.additionalProducts && oilChange.additionalProducts.length > 0) {
         for (const ap of oilChange.additionalProducts) {
           calculatedPrice += ap.price * ap.quantity;
+        }
+      }
+
+      if (oilChange.customProducts && oilChange.customProducts.length > 0) {
+        for (const cp of oilChange.customProducts as any[]) {
+          calculatedPrice += (Number(cp.price) || 0) * (Number(cp.quantity) || 1);
         }
       }
       

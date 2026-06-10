@@ -38,46 +38,20 @@ export function EmployeeCommissionControl({
   const [isOpen, setIsOpen] = useState(false)
   const [localCommissions, setLocalCommissions] = useState<EmployeeCommission[]>([])
 
-  const normalizeCommissions = (commissionsToNormalize: EmployeeCommission[]) => {
-    if (laborCost <= 0) {
-      return commissionsToNormalize.map((commission) => ({
-        ...commission,
-        commissionRate: 0,
-        commissionAmount: 0
-      }))
-    }
-
-    const total = commissionsToNormalize.reduce((sum, commission) => sum + commission.commissionAmount, 0)
-    if (total <= laborCost) {
-      return commissionsToNormalize
-    }
-
-    const scale = laborCost / total
-    return commissionsToNormalize.map((commission) => {
-      const normalizedAmount = Math.round(commission.commissionAmount * scale)
-      const normalizedRate = Math.round((normalizedAmount * 10000) / laborCost) / 100
-      return {
-        ...commission,
-        commissionRate: normalizedRate,
-        commissionAmount: normalizedAmount
-      }
-    })
-  }
-
   // Initialize commissions when props change
   useEffect(() => {
+    console.log('EmployeeCommissionControl useEffect triggered:', {
+      selectedEmployees,
+      totalServicePrice,
+      laborCost,
+      commissions,
+      localCommissions
+    })
+    
     if (selectedEmployees.length === 0) {
       setLocalCommissions([])
       return
     }
-
-    const selectedEmployeesData = selectedEmployees
-      .map(employeeId => employees.find(e => e._id === employeeId))
-      .filter(Boolean) as Employee[]
-    const totalDefaultRate = selectedEmployeesData.reduce((sum, employee) => sum + (employee.commissionRate || 0), 0)
-    const sharedDefaultRate = selectedEmployees.length > 0
-      ? Math.round(((totalDefaultRate / selectedEmployees.length) / selectedEmployees.length) * 100) / 100
-      : 0
 
     const newCommissions = selectedEmployees.map(employeeId => {
       const employee = employees.find(e => e._id === employeeId)
@@ -100,8 +74,8 @@ export function EmployeeCommissionControl({
         }
       }
       
-      // Use a shared default rate and split equally between selected employees.
-      const defaultRate = sharedDefaultRate
+      // Create new commission with equal distribution (100% / number of employees)
+      const defaultRate = Math.round(100 / selectedEmployees.length)
       const amount = Math.round((laborCost * defaultRate) / 100)
       
       return {
@@ -111,24 +85,9 @@ export function EmployeeCommissionControl({
       }
     })
     
-    const normalizedCommissions = normalizeCommissions(newCommissions)
-
-    const hasChanged =
-      normalizedCommissions.length !== localCommissions.length ||
-      normalizedCommissions.some((next, index) => {
-        const current = localCommissions[index]
-        if (!current) return true
-        return (
-          current.employee !== next.employee ||
-          current.commissionRate !== next.commissionRate ||
-          current.commissionAmount !== next.commissionAmount
-        )
-      })
-
-    if (hasChanged) {
-      setLocalCommissions(normalizedCommissions)
-      onCommissionsChange(normalizedCommissions)
-    }
+    console.log('Setting new commissions:', newCommissions)
+    setLocalCommissions(newCommissions)
+    onCommissionsChange(newCommissions)
   }, [selectedEmployees, employees, laborCost])
 
   // Update commissions when laborCost changes
@@ -138,16 +97,15 @@ export function EmployeeCommissionControl({
         ...commission,
         commissionAmount: Math.round((laborCost * commission.commissionRate) / 100)
       }))
-      const normalizedCommissions = normalizeCommissions(updatedCommissions)
       
       // Check if amounts actually changed
-      const hasChanged = normalizedCommissions.some((updated, index) => 
+      const hasChanged = updatedCommissions.some((updated, index) => 
         updated.commissionAmount !== localCommissions[index].commissionAmount
       )
       
       if (hasChanged) {
-        setLocalCommissions(normalizedCommissions)
-        onCommissionsChange(normalizedCommissions)
+        setLocalCommissions(updatedCommissions)
+        onCommissionsChange(updatedCommissions)
       }
     }
   }, [laborCost])
@@ -161,10 +119,10 @@ export function EmployeeCommissionControl({
         ? { ...commission, commissionRate: newRate, commissionAmount: newAmount }
         : commission
     )
-    const normalizedCommissions = normalizeCommissions(updatedCommissions)
     
-    setLocalCommissions(normalizedCommissions)
-    onCommissionsChange(normalizedCommissions)
+    console.log('Rate changed, updating commissions:', updatedCommissions)
+    setLocalCommissions(updatedCommissions)
+    onCommissionsChange(updatedCommissions)
   }
 
   // Update commission rate when amount changes
@@ -176,10 +134,10 @@ export function EmployeeCommissionControl({
         ? { ...commission, commissionRate: newRate, commissionAmount: newAmount }
         : commission
     )
-    const normalizedCommissions = normalizeCommissions(updatedCommissions)
     
-    setLocalCommissions(normalizedCommissions)
-    onCommissionsChange(normalizedCommissions)
+    console.log('Amount changed, updating commissions:', updatedCommissions)
+    setLocalCommissions(updatedCommissions)
+    onCommissionsChange(updatedCommissions)
   }
 
   const totalCommission = localCommissions.reduce((sum, c) => sum + c.commissionAmount, 0)

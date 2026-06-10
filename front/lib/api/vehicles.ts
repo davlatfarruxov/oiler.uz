@@ -20,6 +20,9 @@ export interface UnifiedHistoryItem {
   airFilter?: any
   cabinFilter?: any
   fuelFilter?: any
+  oilQuantityUsed?: number
+  additionalProducts?: any[]
+  customProducts?: any[]
   serviceItems?: any[]
   laborCost?: number
   notes?: string

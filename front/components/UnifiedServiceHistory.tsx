@@ -85,26 +85,59 @@ export function UnifiedServiceHistory({
     }
   }
 
-  const formatOilChangeItems = (item: UnifiedHistoryItem): string[] => {
-    const items: string[] = []
+  const formatOilChangeItems = (item: UnifiedHistoryItem): Array<{ label: string; amount?: number }> => {
+    const items: Array<{ label: string; amount?: number }> = []
 
     console.log('Oil change item:', item) // Debug log
 
     if (item.oilProduct) {
-      items.push(`Moy: ${item.oilProduct.displayName || item.oilProduct.brand}`)
+      const oilName = item.oilProduct.displayName || item.oilProduct.brand || 'Moy'
+      const oilQty = Number((item as any).oilQuantityUsed) || 0
+      const oilVolume = Number(item.oilProduct.volume) || 0
+      const oilPrice = Number(item.oilProduct.price) || 0
+      const oilAmount = oilVolume > 0 ? (oilPrice / oilVolume) * oilQty : oilPrice * oilQty
+      items.push({ label: `Moy: ${oilName}${oilQty > 0 ? ` (${oilQty}L)` : ''}`, amount: oilAmount > 0 ? oilAmount : undefined })
     }
     if (item.oilFilter) {
-      items.push(`Moy filteri: ${item.oilFilter.displayName || item.oilFilter.name}`)
+      items.push({
+        label: `Moy filteri: ${item.oilFilter.displayName || item.oilFilter.name || '—'}`,
+        amount: Number(item.oilFilter.price) || undefined
+      })
     }
     if (item.airFilter) {
-      items.push(`Havo filteri: ${item.airFilter.displayName || item.airFilter.name}`)
+      items.push({
+        label: `Havo filteri: ${item.airFilter.displayName || item.airFilter.name || '—'}`,
+        amount: Number(item.airFilter.price) || undefined
+      })
     }
     if (item.cabinFilter) {
-      items.push(`Salon filteri: ${item.cabinFilter.displayName || item.cabinFilter.name}`)
+      items.push({
+        label: `Salon filteri: ${item.cabinFilter.displayName || item.cabinFilter.name || '—'}`,
+        amount: Number(item.cabinFilter.price) || undefined
+      })
     }
     if (item.fuelFilter) {
-      items.push(`Yoqilg'i filteri: ${item.fuelFilter.displayName || item.fuelFilter.name}`)
+      items.push({
+        label: `Yoqilg'i filteri: ${item.fuelFilter.displayName || item.fuelFilter.name || '—'}`,
+        amount: Number(item.fuelFilter.price) || undefined
+      })
     }
+
+    const additionalProducts = (item as any).additionalProducts || []
+    additionalProducts.forEach((ap: any) => {
+      items.push({
+        label: `Qo'shimcha: ${ap?.product?.name || 'Mahsulot'}`,
+        amount: Number(ap?.price) || undefined
+      })
+    })
+
+    const customProducts = (item as any).customProducts || []
+    customProducts.forEach((cp: any) => {
+      items.push({
+        label: `Qo'lda: ${cp?.name || 'Mahsulot'}`,
+        amount: Number(cp?.price) || undefined
+      })
+    })
 
     return items
   }
@@ -213,9 +246,10 @@ export function UnifiedServiceHistory({
                 <>
                   <div className="space-y-1 mb-3">
                     {formatOilChangeItems(item).length > 0 ? (
-                      formatOilChangeItems(item).map((itemText, index) => (
-                        <div key={index} className="text-sm text-muted-foreground">
-                          • {itemText}
+                      formatOilChangeItems(item).map((line, index) => (
+                        <div key={index} className="text-sm text-muted-foreground flex items-center justify-between gap-3">
+                          <span>• {line.label}</span>
+                          {line.amount != null && <span className="font-medium">{line.amount.toLocaleString()} so'm</span>}
                         </div>
                       ))
                     ) : (

@@ -31,6 +31,8 @@ type FilterLike = {
   brand?: string
   partNumber?: string
   price?: number
+  salePrice?: number
+  sellingPrice?: number
   stock?: number
   compatibleVehicles?: string[]
 }
@@ -96,6 +98,8 @@ export default function VehicleDetailPage() {
   const [editServiceAirFilterCustomerProvided, setEditServiceAirFilterCustomerProvided] = useState(false)
   const [editServiceCabinFilterCustomerProvided, setEditServiceCabinFilterCustomerProvided] = useState(false)
   const [editServiceLaborCost, setEditServiceLaborCost] = useState(0)
+  const [editServiceAdditionalProductIds, setEditServiceAdditionalProductIds] = useState<string[]>([])
+  const [editServiceCustomProducts, setEditServiceCustomProducts] = useState<Array<{ name: string; price: string }>>([])
   const [editServiceFuelFilterCustomerProvided, setEditServiceFuelFilterCustomerProvided] = useState(false)
 
   // Customer debt state
@@ -265,46 +269,94 @@ export default function VehicleDetailPage() {
     }
   }
 
-  const calculateTotalPrice = () => {
-    let total = Number(formData.laborCost) || 0
-    
-    // Add oil product price
+  const getItemPrice = (item: any): number => {
+    if (!item) return 0
+    return Number(item.price ?? item.salePrice ?? item.sellingPrice ?? 0)
+  }
+
+  const buildPriceBreakdown = () => {
+    const lines: Array<{ label: string; amount: number }> = []
+    let total = 0
+
     if (!formData.oilProductCustomerProvided && formData.oilProductId) {
       const oilProduct = oilProducts.find(p => p._id === formData.oilProductId)
-      if (oilProduct) {
-        total += (oilProduct.price || 0) * (Number(formData.oilQuantityUsed) || 1)
+      if (oilProduct && formData.oilQuantityUsed) {
+        const quantityUsed = Number(formData.oilQuantityUsed)
+        const productPrice = Number(oilProduct.price) || 0
+        const productVolume = Number(oilProduct.volume) || 0
+        const oilAmount =
+          productVolume > 0 ? (productPrice / productVolume) * quantityUsed : productPrice * quantityUsed
+        if (oilAmount > 0) {
+          lines.push({ label: `Moy (${quantityUsed}L)`, amount: oilAmount })
+          total += oilAmount
+        }
       }
     }
-    
-    // Add filter prices
+
     if (!formData.oilFilterCustomerProvided && formData.oilFilterId) {
       const filter = oilFilters.find(f => f._id === formData.oilFilterId)
-      if (filter) total += filter.price || 0
+      const amount = getItemPrice(filter)
+      if (amount > 0) {
+        lines.push({ label: 'Moy filtri', amount })
+        total += amount
+      }
     }
-    
+
     if (!formData.airFilterCustomerProvided && formData.airFilterId) {
       const filter = airFilters.find(f => f._id === formData.airFilterId)
-      if (filter) total += filter.price || 0
+      const amount = getItemPrice(filter)
+      if (amount > 0) {
+        lines.push({ label: 'Havo filtri', amount })
+        total += amount
+      }
     }
-    
+
     if (!formData.cabinFilterCustomerProvided && formData.cabinFilterId) {
       const filter = cabinFilters.find(f => f._id === formData.cabinFilterId)
-      if (filter) total += filter.price || 0
+      const amount = getItemPrice(filter)
+      if (amount > 0) {
+        lines.push({ label: 'Salon filtri', amount })
+        total += amount
+      }
     }
-    
+
     if (!formData.fuelFilterCustomerProvided && formData.fuelFilterId) {
       const filter = fuelFilters.find(f => f._id === formData.fuelFilterId)
-      if (filter) total += filter.price || 0
+      const amount = getItemPrice(filter)
+      if (amount > 0) {
+        lines.push({ label: "Yoqilg'i filtri", amount })
+        total += amount
+      }
     }
-    
-    // Add additional products
+
     formData.additionalProducts.forEach(productId => {
       const product = additionalProducts.find(p => p._id === productId)
-      if (product) total += product.price || 0
+      if (!product) return
+      const amount = Number(product.price) || 0
+      if (amount > 0) {
+        lines.push({ label: product.name || "Qo'shimcha mahsulot", amount })
+        total += amount
+      }
     })
-    
-    return total
+
+    formData.customProducts.forEach((product, index) => {
+      const amount = Number(product.price) || 0
+      if (amount > 0) {
+        lines.push({ label: product.name || `Qo'shimcha #${index + 1}`, amount })
+        total += amount
+      }
+    })
+
+    const laborAmount = Number(formData.laborCost) || 0
+    if (laborAmount > 0) {
+      lines.push({ label: 'Ish haqi', amount: laborAmount })
+      total += laborAmount
+    }
+
+    return { lines, total }
   }
+
+  const calculateTotalPrice = () => buildPriceBreakdown().total
 
   // Lazy load payment history when dropdown opens
   useEffect(() => {
@@ -619,6 +671,17 @@ export default function VehicleDetailPage() {
     setEditServiceFuelFilterId(service.fuelFilter?._id || 'none')
     setEditServiceFuelFilterCustomerProvided(service.fuelFilterCustomerProvided || false)
     setEditServiceEmployeeIds(service.employees?.map((e: any) => e?._id || e) || [])
+    setEditServiceAdditionalProductIds(
+      (service.additionalProducts || [])
+        .map((ap: any) => ap?.product?._id || ap?.product)
+        .filter(Boolean)
+    )
+    setEditServiceCustomProducts(
+      (service.customProducts || []).map((cp: any) => ({
+        name: cp?.name || '',
+        price: String(cp?.price || '')
+      }))
+    )
     
     // Initialize labor cost state
     setEditServiceLaborCost(service.laborCost || 0)
@@ -733,6 +796,17 @@ export default function VehicleDetailPage() {
 
       // Add employee commissions - always send current commissions
       updateData.employeeCommissions = employeeCommissions
+      updateData.additionalProducts = editServiceAdditionalProductIds.map((productId) => ({
+        productId,
+        quantity: 1
+      }))
+      updateData.customProducts = editServiceCustomProducts
+        .filter((cp) => cp.name.trim() && Number(cp.price) > 0)
+        .map((cp) => ({
+          name: cp.name.trim(),
+          quantity: 1,
+          price: Number(cp.price)
+        }))
       
       console.log('Updating service with data:', updateData)
       console.log('Employee commissions being sent:', employeeCommissions)
@@ -744,6 +818,8 @@ export default function VehicleDetailPage() {
       setShowEditService(false)
       setEditingService(null)
       setEditServiceLaborCost(0)
+      setEditServiceAdditionalProductIds([])
+      setEditServiceCustomProducts([])
       setEmployeeCommissions([]) // Reset commissions after successful update
       fetchVehicleData() // Reload data
     } catch (error: any) {
@@ -799,64 +875,6 @@ export default function VehicleDetailPage() {
     } catch (error) {
       console.error('Failed to load form data:', error)
     }
-  }
-
-  const calculatePrice = () => {
-    let total = 0
-
-    // Oil product price - only if NOT customer provided
-    if (!formData.oilProductCustomerProvided) {
-      const oilProduct = oilProducts.find(p => p._id === formData.oilProductId)
-      if (oilProduct && formData.oilQuantityUsed) {
-        const quantityUsed = Number(formData.oilQuantityUsed)
-        const pricePerLiter = oilProduct.price / oilProduct.volume
-        total += pricePerLiter * quantityUsed
-      }
-    }
-
-    // Oil Filter price - only if NOT customer provided
-    if (!formData.oilFilterCustomerProvided && formData.oilFilterId) {
-      const filter = oilFilters.find(f => f._id === formData.oilFilterId)
-      if (filter) total += filter.price
-    }
-
-    // Air Filter price - only if NOT customer provided
-    if (!formData.airFilterCustomerProvided && formData.airFilterId) {
-      const filter = airFilters.find(f => f._id === formData.airFilterId)
-      if (filter) total += filter.price
-    }
-
-    // Cabin Filter price - only if NOT customer provided
-    if (!formData.cabinFilterCustomerProvided && formData.cabinFilterId) {
-      const filter = cabinFilters.find(f => f._id === formData.cabinFilterId)
-      if (filter) total += filter.price
-    }
-
-    // Fuel Filter price - only if NOT customer provided
-    if (!formData.fuelFilterCustomerProvided && formData.fuelFilterId) {
-      const filter = fuelFilters.find(f => f._id === formData.fuelFilterId)
-      if (filter) total += filter.price
-    }
-
-    // Additional products
-    formData.additionalProducts.forEach(productId => {
-      const product = additionalProducts.find(p => p._id === productId)
-      if (product) total += product.price
-    })
-
-    // Custom products (manually entered)
-    formData.customProducts.forEach(product => {
-      if (product.price) {
-        total += Number(product.price)
-      }
-    })
-
-    // Labor cost
-    if (formData.laborCost) {
-      total += Number(formData.laborCost)
-    }
-
-    return total
   }
 
   const handleAdditionalProductChange = (productId: string, checked: boolean) => {
@@ -915,6 +933,13 @@ export default function VehicleDetailPage() {
           productId,
           quantity: 1
         })),
+        customProducts: formData.customProducts
+          .filter((product) => product.name.trim() && Number(product.price) > 0)
+          .map((product) => ({
+            name: product.name.trim(),
+            quantity: 1,
+            price: Number(product.price)
+          })),
         mileage: Number(formData.mileage),
         nextServiceMileage: Number(formData.nextServiceMileage),
         laborCost: Number(formData.laborCost) || 0,
@@ -1080,6 +1105,70 @@ export default function VehicleDetailPage() {
   const totalServices = 0 // Placeholder - can be calculated from unified history if needed
   const lastService = null // Placeholder - can be calculated from unified history if needed
   const oilChanges = [] // No longer used, UnifiedServiceHistory handles this
+
+  const priceBreakdown = buildPriceBreakdown()
+
+  const buildEditPriceBreakdown = () => {
+    if (!editingService) return { lines: [] as Array<{ label: string; amount: number }>, total: 0 }
+
+    const lines: Array<{ label: string; amount: number }> = []
+    let total = 0
+
+    if (!editServiceOilProductCustomerProvided && editServiceOilProductId && editServiceOilProductId !== 'none') {
+      const oilProduct = oilProducts.find((p) => p._id === editServiceOilProductId)
+      if (oilProduct) {
+        const quantityUsed = Number(editingService.oilQuantityUsed) || 0
+        const unitPrice = Number(oilProduct.price) || 0
+        const volume = Number(oilProduct.volume) || 0
+        const amount = volume > 0 ? (unitPrice / volume) * quantityUsed : unitPrice * quantityUsed
+        if (amount > 0) {
+          lines.push({ label: `Moy (${quantityUsed}L)`, amount })
+          total += amount
+        }
+      }
+    }
+
+    const pushFilterLine = (label: string, list: any[], id: string, customerProvided: boolean) => {
+      if (customerProvided || !id || id === 'none') return
+      const selected = list.find((x) => x._id === id)
+      const amount = Number(selected?.price ?? selected?.salePrice ?? selected?.sellingPrice ?? 0)
+      if (amount > 0) {
+        lines.push({ label, amount })
+        total += amount
+      }
+    }
+
+    pushFilterLine('Moy filtri', oilFilters, editServiceOilFilterId, editServiceOilFilterCustomerProvided)
+    pushFilterLine('Havo filtri', airFilters, editServiceAirFilterId, editServiceAirFilterCustomerProvided)
+    pushFilterLine('Salon filtri', cabinFilters, editServiceCabinFilterId, editServiceCabinFilterCustomerProvided)
+    pushFilterLine("Yoqilg'i filtri", fuelFilters, editServiceFuelFilterId, editServiceFuelFilterCustomerProvided)
+
+    editServiceAdditionalProductIds.forEach((id) => {
+      const product = additionalProducts.find((p) => p._id === id)
+      const amount = Number(product?.price) || 0
+      if (amount > 0) {
+        lines.push({ label: product?.name || "Qo'shimcha mahsulot", amount })
+        total += amount
+      }
+    })
+
+    editServiceCustomProducts.forEach((cp, idx) => {
+      const amount = Number(cp.price) || 0
+      if (amount > 0) {
+        lines.push({ label: cp.name || `Qo'lda mahsulot #${idx + 1}`, amount })
+        total += amount
+      }
+    })
+
+    if (editServiceLaborCost > 0) {
+      lines.push({ label: 'Ish haqi', amount: editServiceLaborCost })
+      total += editServiceLaborCost
+    }
+
+    return { lines, total }
+  }
+
+  const editPriceBreakdown = buildEditPriceBreakdown()
 
   return (
     <div className="space-y-6">
@@ -1791,10 +1880,18 @@ export default function VehicleDetailPage() {
                     </p>
                   </div>
                   <div className="bg-muted/30 p-4 rounded-lg">
+                    <div className="space-y-1 mb-3 text-sm">
+                      {editPriceBreakdown.lines.map((line, idx) => (
+                        <div key={idx} className="flex items-center justify-between">
+                          <span className="text-muted-foreground">{line.label}:</span>
+                          <span className="font-medium">{line.amount.toLocaleString()} so'm</span>
+                        </div>
+                      ))}
+                    </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-muted-foreground">Jami narx:</span>
                       <span className="text-2xl font-bold text-primary">
-                        {(editingService.price || 0).toLocaleString()} so'm
+                        {editPriceBreakdown.total.toLocaleString()} so'm
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-2">
@@ -1805,22 +1902,97 @@ export default function VehicleDetailPage() {
               </div>
 
               {/* Additional Products */}
-              {editingService.additionalProducts && editingService.additionalProducts.length > 0 && (
-                <div className="border-b pb-4">
-                  <h3 className="font-semibold text-foreground mb-3">Qo'shimcha mahsulotlar</h3>
-                  <div className="space-y-2">
-                    {editingService.additionalProducts.map((prod: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between text-sm bg-muted/30 p-2 rounded">
-                        <span>{prod.product?.name || 'Noma\'lum'}</span>
-                        <span>Miqdor: {prod.quantity} × {prod.price} so'm</span>
-                      </div>
+              <div className="border-b pb-4">
+                <h3 className="font-semibold text-foreground mb-3">Qo'shimcha mahsulotlar</h3>
+                {additionalProducts.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Qo'shimcha mahsulotlar topilmadi</p>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                    {additionalProducts.map((product) => (
+                      <label key={product._id} className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Checkbox
+                            checked={editServiceAdditionalProductIds.includes(product._id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setEditServiceAdditionalProductIds((prev) =>
+                                  prev.includes(product._id) ? prev : [...prev, product._id]
+                                )
+                              } else {
+                                setEditServiceAdditionalProductIds((prev) => prev.filter((id) => id !== product._id))
+                              }
+                            }}
+                          />
+                          <span className="truncate">{product.name}</span>
+                        </div>
+                        <span className="text-muted-foreground shrink-0">{(product.price || 0).toLocaleString()} so'm</span>
+                      </label>
                     ))}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-2">
-                    Eslatma: Qo'shimcha mahsulotlarni xizmat yaratilgandan keyin o'zgartirib bo'lmaydi.
-                  </p>
+                )}
+                <div className="mt-4 space-y-2">
+                  <Label>Qo'lda qo'shiladigan mahsulotlar</Label>
+                  {editServiceCustomProducts.map((product, idx) => (
+                    <div key={idx} className="grid grid-cols-12 gap-2 items-end">
+                      <div className="col-span-7">
+                        <Input
+                          placeholder="Masalan: Tormoz suyuqligi"
+                          value={product.name}
+                          onChange={(e) => {
+                            setEditServiceCustomProducts((prev) => {
+                              const next = [...prev]
+                              next[idx] = { ...next[idx], name: e.target.value }
+                              return next
+                            })
+                          }}
+                        />
+                      </div>
+                      <div className="col-span-4">
+                        <Input
+                          type="text"
+                          placeholder="50 000"
+                          value={formatNumberWithSpaces(product.price)}
+                          onChange={(e) => {
+                            const numericValue = removeSpaces(e.target.value)
+                            if (/^\d*$/.test(numericValue)) {
+                              setEditServiceCustomProducts((prev) => {
+                                const next = [...prev]
+                                next[idx] = { ...next[idx], price: numericValue }
+                                return next
+                              })
+                            }
+                          }}
+                        />
+                      </div>
+                      <div className="col-span-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive"
+                          onClick={() => {
+                            setEditServiceCustomProducts((prev) => prev.filter((_, i) => i !== idx))
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="w-full"
+                    onClick={() =>
+                      setEditServiceCustomProducts((prev) => [...prev, { name: '', price: '' }])
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Qo'lda mahsulot qo'shish
+                  </Button>
                 </div>
-              )}
+              </div>
 
               {/* Service Date */}
               <div>
@@ -1845,6 +2017,8 @@ export default function VehicleDetailPage() {
                   setShowEditService(false)
                   setEditingService(null)
                   setEditServiceLaborCost(0)
+                  setEditServiceAdditionalProductIds([])
+                  setEditServiceCustomProducts([])
                   setEmployeeCommissions([]) // Reset commissions when closing
                 }}>
                   Bekor qilish
@@ -2343,71 +2517,99 @@ export default function VehicleDetailPage() {
                 </Button>
               )}
 
-              {/* Custom Products Input */}
+              {/* Additional products from inventory */}
               {showAdditionalProducts && (
                 <div className="space-y-3">
-                  {formData.customProducts.map((product, index) => (
-                    <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                      <div className="col-span-7">
-                        <Label>Mahsulot nomi</Label>
-                        <Input
-                          placeholder="Masalan: Tormoz suyuqligi"
-                          value={product.name}
-                          onChange={(e) => {
-                            const newProducts = [...formData.customProducts]
-                            newProducts[index].name = e.target.value
-                            setFormData({ ...formData, customProducts: newProducts })
-                          }}
-                        />
-                      </div>
-                      <div className="col-span-4">
-                        <Label>Narxi (so'm)</Label>
-                        <Input
-                          type="text"
-                          placeholder="50 000"
-                          value={formatNumberWithSpaces(product.price)}
-                          onChange={(e) => {
-                            const numericValue = removeSpaces(e.target.value)
-                            if (/^\d*$/.test(numericValue)) {
-                              const newProducts = [...formData.customProducts]
-                              newProducts[index].price = numericValue
-                              setFormData({ ...formData, customProducts: newProducts })
-                            }
-                          }}
-                        />
-                      </div>
-                      <div className="col-span-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => {
-                            const newProducts = formData.customProducts.filter((_, i) => i !== index)
-                            setFormData({ ...formData, customProducts: newProducts })
-                          }}
-                          className="text-destructive"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
+                  {additionalProducts.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Qo'shimcha mahsulotlar topilmadi</p>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                      {additionalProducts.map((product) => (
+                        <label key={product._id} className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <Checkbox
+                              checked={formData.additionalProducts.includes(product._id)}
+                              onCheckedChange={(checked) => handleAdditionalProductChange(product._id, checked as boolean)}
+                            />
+                            <span className="truncate">{product.name}</span>
+                          </div>
+                          <span className="text-muted-foreground shrink-0">{(product.price || 0).toLocaleString()} so'm</span>
+                        </label>
+                      ))}
                     </div>
-                  ))}
-
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setFormData({
-                        ...formData,
-                        customProducts: [...formData.customProducts, { name: '', price: '' }]
-                      })
-                    }}
-                    className="w-full"
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Yana mahsulot qo'shish
-                  </Button>
+                  )}
+                  {formData.additionalProducts.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      Tanlangan: {formData.additionalProducts.length} ta mahsulot
+                    </div>
+                  )}
+                  {formData.customProducts.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      Qo'lda qo'shilgan: {formData.customProducts.length} ta mahsulot
+                    </div>
+                  )}
+                  <div className="space-y-2 border rounded p-3">
+                    <Label>Qo'lda qo'shiladigan mahsulotlar</Label>
+                    {formData.customProducts.map((product, index) => (
+                      <div key={index} className="grid grid-cols-12 gap-2 items-end">
+                        <div className="col-span-7">
+                          <Input
+                            placeholder="Masalan: Tormoz suyuqligi"
+                            value={product.name}
+                            onChange={(e) => {
+                              const newProducts = [...formData.customProducts]
+                              newProducts[index].name = e.target.value
+                              setFormData({ ...formData, customProducts: newProducts })
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-4">
+                          <Input
+                            type="text"
+                            placeholder="50 000"
+                            value={formatNumberWithSpaces(product.price)}
+                            onChange={(e) => {
+                              const numericValue = removeSpaces(e.target.value)
+                              if (/^\d*$/.test(numericValue)) {
+                                const newProducts = [...formData.customProducts]
+                                newProducts[index].price = numericValue
+                                setFormData({ ...formData, customProducts: newProducts })
+                              }
+                            }}
+                          />
+                        </div>
+                        <div className="col-span-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive"
+                            onClick={() => {
+                              const newProducts = formData.customProducts.filter((_, i) => i !== index)
+                              setFormData({ ...formData, customProducts: newProducts })
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setFormData({
+                          ...formData,
+                          customProducts: [...formData.customProducts, { name: '', price: '' }]
+                        })
+                      }
+                      className="w-full"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Qo'lda mahsulot qo'shish
+                    </Button>
+                  </div>
                 </div>
               )}
             </div>
@@ -2531,13 +2733,13 @@ export default function VehicleDetailPage() {
             <PaymentStatusSelector
               paymentStatus={formData.paymentStatus}
               amountPaid={formData.amountPaid}
-              totalPrice={calculatePrice()}
+              totalPrice={calculateTotalPrice()}
               dueDate={formData.dueDate}
               onPaymentStatusChange={(status) => {
                 setFormData({ 
                   ...formData, 
                   paymentStatus: status,
-                  amountPaid: status === 'paid' ? String(calculatePrice()) : status === 'unpaid' ? '' : formData.amountPaid
+                  amountPaid: status === 'paid' ? String(calculateTotalPrice()) : status === 'unpaid' ? '' : formData.amountPaid
                 })
               }}
               onAmountPaidChange={(amount) => setFormData({ ...formData, amountPaid: amount })}
@@ -2547,20 +2749,20 @@ export default function VehicleDetailPage() {
             {/* Price Summary */}
             <div className="bg-secondary/50 p-4 rounded-lg">
               <div className="space-y-2 text-sm mb-3">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Mahsulotlar va qismlar:</span>
-                  <span className="font-medium">{(calculatePrice() - (Number(formData.laborCost) || 0)).toLocaleString()} so'm</span>
-                </div>
-                {formData.laborCost && Number(formData.laborCost) > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground">Ish haqi:</span>
-                    <span className="font-medium">{Number(formData.laborCost).toLocaleString()} so'm</span>
-                  </div>
+                {priceBreakdown.lines.length > 0 ? (
+                  priceBreakdown.lines.map((line, idx) => (
+                    <div key={idx} className="flex justify-between">
+                      <span className="text-muted-foreground">{line.label}:</span>
+                      <span className="font-medium">{line.amount.toLocaleString()} so'm</span>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-muted-foreground">Hozircha narxga qo'shilgan mahsulot yo'q</div>
                 )}
               </div>
               <div className="flex justify-between items-center pt-3 border-t">
                 <span className="text-foreground font-semibold">Jami narx:</span>
-                <span className="text-2xl font-bold text-primary">{calculatePrice().toLocaleString()} so'm</span>
+                <span className="text-2xl font-bold text-primary">{calculateTotalPrice().toLocaleString()} so'm</span>
               </div>
             </div>
 
@@ -2626,7 +2828,7 @@ export default function VehicleDetailPage() {
                   <div className="border-2 border-dashed p-3 inline-block relative">
                     <div className="text-xs space-y-1 text-left" style={{ paddingRight: '60px' }}>
                       <div className="text-center pb-1 mb-2">
-                        <p className="font-bold text-sm">{tenant?.companyName || 'OILER.UZ'}</p>
+                        <p className="font-bold text-sm">{'OILER.UZ'}</p>
                         <p className="text-[9px]">{tenant?.businessPhone || ''}</p>
                       </div>
                       
