@@ -26,6 +26,7 @@ import {
   Shield,
   KeyRound,
   UserCog,
+  Banknote,
 } from 'lucide-react'
 import { Toaster } from 'sonner'
 
@@ -41,6 +42,7 @@ const ALL_NAV: NavItem[] = [
   { name: 'Xizmat', href: '/dashboard/service', icon: Wrench, perm: 'service.view' },
   { name: 'Xodimlar', href: '/dashboard/employees', icon: Users, perm: 'employees.view' },
   { name: 'Ombor', href: '/dashboard/inventory', icon: Package, perm: 'inventory.view' },
+  { name: 'Moliya', href: '/dashboard/finance', icon: Banknote, perm: 'dashboard.view' },
   { name: 'Arxiv', href: '/dashboard/archives', icon: Archive, perm: 'archives.view' },
   { name: 'Sozlamalar', href: '/dashboard/settings', icon: Settings, perm: 'settings.view' },
   { name: 'Rollar', href: '/dashboard/roles', icon: Shield, perm: 'roles.manage' },

@@ -143,7 +143,15 @@ const RULES: Rule[] = [
   { test: /^\/api\/v1\/services\/[^/]+$/, method: /^DELETE$/, permission: 'service.edit' },
 
   { test: /^\/api\/v1\/roles/, method: /.*/, permission: 'roles.manage' },
-  { test: /^\/api\/v1\/tenant-users/, method: /.*/, permission: 'users.manage' }
+  { test: /^\/api\/v1\/tenant-users/, method: /.*/, permission: 'users.manage' },
+
+  { test: /^\/api\/v1\/finance\/summary$/, method: /^GET$/, permission: 'dashboard.view' },
+  { test: /^\/api\/v1\/finance\/chart$/, method: /^GET$/, permission: 'dashboard.view' },
+  { test: /^\/api\/v1\/finance\/inventory-value$/, method: /^GET$/, permission: 'dashboard.view' },
+  { test: /^\/api\/v1\/finance\/expenses$/, method: /^GET$/, permission: 'dashboard.view' },
+  { test: /^\/api\/v1\/finance\/expenses$/, method: /^POST$/, permission: 'inventory.edit' },
+  { test: /^\/api\/v1\/finance\/expenses\/[^/]+$/, method: /^PUT$/, permission: 'inventory.edit' },
+  { test: /^\/api\/v1\/finance\/expenses\/[^/]+$/, method: /^DELETE$/, permission: 'inventory.edit' }
 ];
 
 function pathWithoutQuery(url: string): string {

@@ -220,16 +220,20 @@ export class PaymentService {
    * Calculate customer's total debt (without updating)
    * Includes both oil changes and services
    */
-  async calculateCustomerDebt(tenantId: string, customerId: string): Promise<number> {
+  async calculateCustomerDebt(tenantId: string, customerId: string, vehicleId?: string): Promise<number> {
     const mongoose = require('mongoose');
-    
+
+    // Ixtiyoriy: faqat bitta mashina bo'yicha qarz (mashinaga bog'langan qarz)
+    const vehicleMatch = vehicleId ? { vehicle: new mongoose.Types.ObjectId(vehicleId) } : {};
+
     // Aggregate amountDue from OilChange collection
     const oilChangeResult = await OilChange.aggregate([
       {
         $match: {
           tenant: new mongoose.Types.ObjectId(tenantId),
           customer: new mongoose.Types.ObjectId(customerId),
-          isArchived: { $ne: true }
+          isArchived: { $ne: true },
+          ...vehicleMatch
         }
       },
       {
@@ -246,7 +250,8 @@ export class PaymentService {
         $match: {
           tenant: new mongoose.Types.ObjectId(tenantId),
           customer: new mongoose.Types.ObjectId(customerId),
-          isArchived: { $ne: true }
+          isArchived: { $ne: true },
+          ...vehicleMatch
         }
       },
       {
@@ -312,24 +317,30 @@ export class PaymentService {
   /**
    * Get payment summary for a customer (includes both oil changes and services)
    */
-  async getCustomerPaymentSummary(tenantId: string, customerId: string): Promise<any> {
+  async getCustomerPaymentSummary(tenantId: string, customerId: string, vehicleId?: string): Promise<any> {
+    // Ixtiyoriy: faqat bitta mashina bo'yicha (qarz mashinaga bog'langan)
+    const vehicleFilter = vehicleId ? { vehicle: vehicleId } : {};
+
     const [totalDebt, unpaidOilChanges, unpaidServices, overdueOilChanges, overdueServices, recentPayments, unpaidOilChangesList, unpaidServicesList] = await Promise.all([
-      this.calculateCustomerDebt(tenantId, customerId),
+      this.calculateCustomerDebt(tenantId, customerId, vehicleId),
       OilChange.countDocuments({
         tenant: tenantId,
         customer: customerId,
+        ...vehicleFilter,
         isArchived: { $ne: true },
         paymentStatus: 'unpaid'
       }),
       Service.countDocuments({
         tenant: tenantId,
         customer: customerId,
+        ...vehicleFilter,
         isArchived: { $ne: true },
         paymentStatus: 'unpaid'
       }),
       OilChange.countDocuments({
         tenant: tenantId,
         customer: customerId,
+        ...vehicleFilter,
         isArchived: { $ne: true },
         amountDue: { $gt: 0 },
         dueDate: { $lt: new Date() }
@@ -337,6 +348,7 @@ export class PaymentService {
       Service.countDocuments({
         tenant: tenantId,
         customer: customerId,
+        ...vehicleFilter,
         isArchived: { $ne: true },
         amountDue: { $gt: 0 },
         dueDate: { $lt: new Date() }
@@ -353,6 +365,7 @@ export class PaymentService {
       OilChange.find({
         tenant: tenantId,
         customer: customerId,
+        ...vehicleFilter,
         isArchived: { $ne: true },
         amountDue: { $gt: 0 }
       })
@@ -362,6 +375,7 @@ export class PaymentService {
       Service.find({
         tenant: tenantId,
         customer: customerId,
+        ...vehicleFilter,
         isArchived: { $ne: true },
         amountDue: { $gt: 0 }
       })

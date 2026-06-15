@@ -63,6 +63,13 @@ export class OilChangeService {
       throw new ApiError(404, 'One or more employees not found');
     }
 
+    // Price snapshots — saved at time of service creation
+    let oilProductPriceAtService: number | undefined;
+    let oilFilterPriceAtService: number | undefined;
+    let airFilterPriceAtService: number | undefined;
+    let cabinFilterPriceAtService: number | undefined;
+    let fuelFilterPriceAtService: number | undefined;
+
     let oilProduct = null;
     // Only fetch and decrease stock if NOT customer provided
     if (!data.oilProductCustomerProvided) {
@@ -76,7 +83,12 @@ export class OilChangeService {
       if (oilProduct.stock < 1) {
         throw new ApiError(400, 'Oil product out of stock');
       }
-      // Decrease oil product stock
+      // Snapshot price before stock change
+      const oilQty = data.oilQuantityUsed || 0;
+      const oilVol = oilProduct.volume || 0;
+      oilProductPriceAtService = oilQty > 0 && oilVol > 0
+        ? Math.round((oilProduct.price / oilVol) * oilQty)
+        : oilProduct.price;
       oilProduct.stock -= 1;
       await oilProduct.save();
     }
@@ -87,7 +99,7 @@ export class OilChangeService {
       if (!oilFilter) {
         throw new ApiError(404, 'Oil filter not found');
       }
-      // Decrease oil filter stock
+      oilFilterPriceAtService = oilFilter.price;
       oilFilter.stock -= 1;
       await oilFilter.save();
     }
@@ -97,6 +109,7 @@ export class OilChangeService {
       if (!airFilter) {
         throw new ApiError(404, 'Air filter not found');
       }
+      airFilterPriceAtService = airFilter.price;
       airFilter.stock -= 1;
       await airFilter.save();
     }
@@ -106,6 +119,7 @@ export class OilChangeService {
       if (!cabinFilter) {
         throw new ApiError(404, 'Cabin filter not found');
       }
+      cabinFilterPriceAtService = cabinFilter.price;
       cabinFilter.stock -= 1;
       await cabinFilter.save();
     }
@@ -115,6 +129,7 @@ export class OilChangeService {
       if (!fuelFilter) {
         throw new ApiError(404, 'Fuel filter not found');
       }
+      fuelFilterPriceAtService = fuelFilter.price;
       fuelFilter.stock -= 1;
       await fuelFilter.save();
     }
@@ -194,6 +209,11 @@ export class OilChangeService {
       fuelFilterCustomerProvidedDetails: data.fuelFilterCustomerProvidedDetails,
       additionalProducts,
       customProducts,
+      oilProductPriceAtService,
+      oilFilterPriceAtService,
+      airFilterPriceAtService,
+      cabinFilterPriceAtService,
+      fuelFilterPriceAtService,
       mileage: data.mileage,
       nextServiceMileage: data.nextServiceMileage,
       laborCost: laborCost,
@@ -209,18 +229,31 @@ export class OilChangeService {
     // Update customer total debt
     await this.updateCustomerDebt(tenantId, data.customerId);
 
-    return oilChange.populate([
+    const populated = await oilChange.populate([
       'vehicle',
       'customer',
       'employees',
       'employeeCommissions.employee',
-      'oilProduct',
+      {
+        path: 'oilProduct',
+        populate: { path: 'brand', select: 'name' }
+      },
       'oilFilter',
       'airFilter',
       'cabinFilter',
       'fuelFilter',
       'additionalProducts.product'
     ]);
+
+    // Transform oilProduct.brand to string (same as getOilChangeById)
+    const doc = populated.toObject() as any;
+    if (doc.oilProduct && typeof doc.oilProduct === 'object') {
+      const brand = doc.oilProduct.brand as any;
+      if (brand && typeof brand === 'object') {
+        doc.oilProduct.brand = brand.name || 'Unknown';
+      }
+    }
+    return doc;
   }
 
   /**

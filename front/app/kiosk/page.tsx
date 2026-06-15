@@ -2,12 +2,9 @@
 
 import { Suspense, useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useSearchParams } from 'next/navigation'
 import api from '@/lib/api/axios'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { UzbekLicensePlate } from '@/components/UzbekLicensePlate'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Loader2, Car, Calendar, Gauge, CheckCircle, XCircle } from 'lucide-react'
@@ -439,122 +436,12 @@ function KioskPublicServiceView({ data, variant = 'default' }: { data: PublicSer
   )
 }
 
-function KioskManualSearch() {
-  const router = useRouter()
-  const [ready, setReady] = useState(false)
-  const [plate, setPlate] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [phase, setPhase] = useState<'input' | 'new_client' | 'known'>('input')
-  const [vehicle, setVehicle] = useState<VehicleRow | null>(null)
-
-  useEffect(() => {
-    setReady(!!(typeof window !== 'undefined' && localStorage.getItem('accessToken')))
-  }, [])
-
-  const onPlateChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const input = e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '')
-    let value = ''
-    if (input.length >= 1) value += input[0].replace(/[^0-9]/g, '')
-    if (input.length >= 2) value += input[1].replace(/[^0-9]/g, '')
-    if (input.length > 2) value += input.slice(2, 8)
-    setPlate(value)
-    setPhase('input')
-    setVehicle(null)
-  }, [])
-
-  const searchPlate = useCallback(async () => {
-    if (plate.length !== 8) return
-    setLoading(true)
-    setVehicle(null)
-    try {
-      const res = await api.get(`/vehicles/search/${plate}`)
-      const v = unwrapData<VehicleRow>(res)
-      if (v?._id) {
-        setVehicle(v)
-        setPhase('known')
-      }
-    } catch (e: unknown) {
-      const status = (e as { response?: { status?: number } })?.response?.status
-      if (status === 404) setPhase('new_client')
-    } finally {
-      setLoading(false)
-    }
-  }, [plate])
-
-  useEffect(() => {
-    if (plate.length === 8 && phase === 'input' && !loading) void searchPlate()
-  }, [plate, phase, loading, searchPlate])
-
-  const resetKiosk = () => {
-    setPlate('')
-    setPhase('input')
-    setVehicle(null)
-  }
-
-  if (!ready) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 p-6 text-center">
-        <p className="max-w-md text-lg text-zinc-300">Avval tizimga kiring, keyin /kiosk sahifasini qayta oching.</p>
-        <Button asChild variant="secondary">
-          <Link href="/login">Kirish</Link>
-        </Button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="mx-auto flex min-h-dvh max-w-4xl flex-col gap-8 px-4 py-10">
-      <header className="space-y-1 text-center">
-        <p className="text-xs font-medium uppercase tracking-[0.2em] text-zinc-500">Kiosk (qo‘lda qidiruv)</p>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">Mashina raqami</h1>
-      </header>
-      <div className="flex flex-col items-center gap-6">
-        <div className="w-full max-w-xl space-y-3">
-          <Label htmlFor="kiosk-plate" className="text-zinc-300">
-            Davlat raqami
-          </Label>
-          <Input
-            id="kiosk-plate"
-            value={plate}
-            onChange={onPlateChange}
-            maxLength={8}
-            className="h-14 border-zinc-600 bg-zinc-900 text-center font-mono text-2xl tracking-[0.25em] text-white"
-          />
-        </div>
-        <div className="flex w-full justify-center overflow-x-auto overflow-y-auto py-6">
-          <UzbekLicensePlate value={plate} scale={1.05} />
-        </div>
-        {loading && phase === 'input' && (
-          <div className="flex items-center gap-2 text-zinc-400">
-            <Loader2 className="h-5 w-5 animate-spin" />
-            Qidirilmoqda…
-          </div>
-        )}
-        {phase === 'new_client' && (
-          <div className="w-full max-w-xl space-y-4 rounded-2xl border border-amber-500/40 bg-amber-950/20 p-6 text-center">
-            <Badge className="bg-amber-500 text-lg text-black">Yangi mijoz</Badge>
-            <Button size="lg" onClick={() => router.push(`/dashboard/service/add?plate=${plate}`)}>
-              Mashinani kiritish
-            </Button>
-            <Button variant="outline" onClick={resetKiosk}>
-              Boshqa raqam
-            </Button>
-          </div>
-        )}
-        {phase === 'known' && vehicle && (
-          <Button asChild size="lg">
-            <Link href={`/dashboard/service/${vehicle._id}`}>Mashina sahifasi</Link>
-          </Button>
-        )}
-      </div>
-    </div>
-  )
-}
 
 function KioskVehicleModes() {
   const searchParams = useSearchParams()
   const vehicleId = searchParams.get('vehicleId') || ''
   const screen = (searchParams.get('screen') || '') as 'new' | 'service' | ''
+  const wantsFullscreen = searchParams.get('fullscreen') === '1'
 
   const [tokenReady, setTokenReady] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -566,6 +453,34 @@ function KioskVehicleModes() {
   useEffect(() => {
     setTokenReady(!!(typeof window !== 'undefined' && localStorage.getItem('accessToken')))
   }, [])
+
+  useEffect(() => {
+    if (!wantsFullscreen) return
+
+    const goFullscreen = () => {
+      const el = document.documentElement
+      if (el.requestFullscreen && !document.fullscreenElement) {
+        el.requestFullscreen().catch(() => {})
+      }
+    }
+
+    // 1) Ochilishi bilan to'g'ridan-to'g'ri urinib ko'ramiz (ba'zi brauzerlarda ishlaydi).
+    goFullscreen()
+
+    // 2) Agar brauzer bloklasa — birinchi teginish/bosishda fullscreen qilamiz.
+    const onFirstInteraction = () => {
+      goFullscreen()
+      window.removeEventListener('pointerdown', onFirstInteraction)
+      window.removeEventListener('keydown', onFirstInteraction)
+    }
+    window.addEventListener('pointerdown', onFirstInteraction)
+    window.addEventListener('keydown', onFirstInteraction)
+
+    return () => {
+      window.removeEventListener('pointerdown', onFirstInteraction)
+      window.removeEventListener('keydown', onFirstInteraction)
+    }
+  }, [wantsFullscreen])
 
   const load = useCallback(async () => {
     if (!vehicleId || (screen !== 'new' && screen !== 'service')) {
@@ -591,9 +506,9 @@ function KioskVehicleModes() {
       setVehicle(v)
 
       if (screen === 'service') {
-        const vehicleCache = readKioskCache(cacheKeyForVehicle(vehicleId))
-        const globalCache = readKioskCache(KIOSK_CACHE_GLOBAL_KEY)
-        const fallbackCache = vehicleCache || globalCache
+        // Faqat shu mashinaning keshidan foydalanamiz. Global keshni ishlatmaymiz,
+        // aks holda yangi mashinada oldingi mijoz ma'lumotlari chiqib qoladi.
+        const fallbackCache = readKioskCache(cacheKeyForVehicle(vehicleId))
         if (fallbackCache) {
           setPublicData(fallbackCache)
         }
@@ -623,7 +538,7 @@ function KioskVehicleModes() {
         writeKioskCache(vehicleId, freshData)
       }
     } catch {
-      const fallbackCache = readKioskCache(cacheKeyForVehicle(vehicleId)) || readKioskCache(KIOSK_CACHE_GLOBAL_KEY)
+      const fallbackCache = readKioskCache(cacheKeyForVehicle(vehicleId))
       if (screen === 'service' && fallbackCache) {
         setPublicData(fallbackCache)
       } else {
@@ -647,7 +562,20 @@ function KioskVehicleModes() {
   }
 
   if (!vehicleId || (screen !== 'new' && screen !== 'service')) {
-    return <KioskManualSearch />
+    return (
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+        <p
+          className="font-black uppercase tracking-[0.18em] text-white"
+          style={{
+            fontFamily: 'Arial Black, Impact, "Franklin Gothic Heavy", sans-serif',
+            fontSize: 'clamp(2.5rem, 10vw, 6rem)',
+          }}
+        >
+          OILER.UZ
+        </p>
+        <p className="text-lg text-zinc-500 md:text-2xl">Kutilmoqda…</p>
+      </div>
+    )
   }
 
   if (loading) {
@@ -692,16 +620,22 @@ function KioskVehicleModes() {
   }
 
   // screen === 'service'
+  // Yangi mijoz (xizmat tarixi yo'q): nomer odatdagidek (compact), pastda "YANGI MIJOZ"
   if (noServiceMsg) {
     return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-8 bg-black p-8">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-12 bg-black p-8">
         <div className="w-full max-w-5xl overflow-x-auto">
           <KioskPlateStrip plateNumber={vehicle.plateNumber} size="compact" />
         </div>
-        <p className="max-w-2xl text-center text-2xl font-semibold text-zinc-200 md:text-3xl">{noServiceMsg}</p>
-        <Button asChild variant="secondary">
-          <Link href={`/dashboard/service/${vehicle._id}`}>Operator sahifasi</Link>
-        </Button>
+        <p
+          className="text-center font-black uppercase leading-none tracking-[0.12em] text-[#39ff14] drop-shadow-[0_0_24px_rgba(57,255,20,0.4)]"
+          style={{
+            fontFamily: 'Arial Black, Impact, "Franklin Gothic Heavy", sans-serif',
+            fontSize: 'clamp(2.75rem, min(18vw, 14vmin), 10rem)',
+          }}
+        >
+          YANGI MIJOZ
+        </p>
       </div>
     )
   }

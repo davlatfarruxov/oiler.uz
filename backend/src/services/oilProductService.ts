@@ -217,4 +217,71 @@ export class OilProductService {
       .lean()
       .sort({ stock: 1 });
   }
+
+  async bulkImport(
+    tenantId: string,
+    rows: Array<Omit<CreateOilProductData, 'brandId'> & { brandName: string }>
+  ): Promise<{ created: number; skipped: number; errors: { row: number; name: string; reason: string }[] }> {
+    let settings = await Settings.findOne({ tenant: tenantId });
+    if (!settings) settings = await Settings.create({ tenant: tenantId });
+    const exchangeRate = settings.exchangeRate;
+
+    // Cache brands to avoid duplicate DB calls
+    const brandCache = new Map<string, string>();
+
+    const resolveBrand = async (brandName: string): Promise<string> => {
+      const key = brandName.toLowerCase().trim();
+      if (brandCache.has(key)) return brandCache.get(key)!;
+
+      let brand = await OilBrand.findOne({
+        tenant: tenantId,
+        name: { $regex: new RegExp(`^${brandName.trim().replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+      });
+      if (!brand) {
+        brand = await OilBrand.create({ tenant: tenantId, name: brandName.trim() });
+      }
+      brandCache.set(key, brand._id.toString());
+      return brand._id.toString();
+    };
+
+    let created = 0;
+    let skipped = 0;
+    const errors: { row: number; name: string; reason: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const { brandName, ...data } = rows[i];
+      const label = `${brandName} ${data.viscosity} ${data.apiGrade} ${data.volume}L`;
+      try {
+        const brandId = await resolveBrand(brandName);
+
+        const existing = await OilProduct.findOne({
+          tenant: tenantId,
+          brand: brandId,
+          viscosity: data.viscosity,
+          apiGrade: data.apiGrade,
+          volume: data.volume,
+        });
+        if (existing) { skipped++; continue; }
+
+        await OilProduct.create({
+          tenant: tenantId,
+          brand: brandId,
+          viscosity: data.viscosity,
+          apiGrade: data.apiGrade.toUpperCase(),
+          volume: data.volume,
+          costPrice: data.costPrice,
+          costCurrency: data.costCurrency,
+          exchangeRateUsed: exchangeRate,
+          price: data.price,
+          stock: data.stock,
+          reorderLevel: data.reorderLevel ?? 10,
+        });
+        created++;
+      } catch {
+        errors.push({ row: i + 2, name: label, reason: 'Saqlashda xatolik' });
+      }
+    }
+
+    return { created, skipped, errors };
+  }
 }

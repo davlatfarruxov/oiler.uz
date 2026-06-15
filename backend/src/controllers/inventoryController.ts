@@ -76,4 +76,19 @@ export class InventoryController {
       next(error);
     }
   }
+
+  async bulkImport(req: AuthRequest, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const tenantId = req.user!.tenantId;
+      const { items } = req.body;
+      if (!Array.isArray(items) || items.length === 0) {
+        res.status(400).json(ApiResponse.error('items massivi bo\'sh yoki noto\'g\'ri'));
+        return;
+      }
+      const result = await inventoryService.bulkImport(tenantId, items);
+      res.status(200).json(ApiResponse.success('Import yakunlandi', result));
+    } catch (error) {
+      next(error);
+    }
+  }
 }

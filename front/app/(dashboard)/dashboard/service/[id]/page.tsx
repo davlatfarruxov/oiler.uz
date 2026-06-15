@@ -79,6 +79,7 @@ export default function VehicleDetailPage() {
   const [showPaymentHistory, setShowPaymentHistory] = useState(false)
   const [showMoreFilters, setShowMoreFilters] = useState(false)
   const [showAdditionalProducts, setShowAdditionalProducts] = useState(false)
+  const [additionalProductSearch, setAdditionalProductSearch] = useState('')
   const [showEditVehicle, setShowEditVehicle] = useState(false)
   const [showHistory, setShowHistory] = useState(false)
   const [historyData, setHistoryData] = useState<any[]>([])
@@ -241,7 +242,9 @@ export default function VehicleDetailPage() {
   const fetchDebtSummary = async (customerId: string) => {
     try {
       setLoadingDebt(true)
-      const response = await api.get(`/payments/customer/${customerId}/summary`)
+      // Qarz mashinaga bog'langan: faqat shu mashina bo'yicha hisoblanadi
+      const vehicleId = params.id as string
+      const response = await api.get(`/payments/customer/${customerId}/summary?vehicleId=${encodeURIComponent(vehicleId)}`)
       setDebtSummary(response.data.data)
       
       // Don't fetch payment history here - it will be lazy loaded when dropdown opens
@@ -449,7 +452,7 @@ export default function VehicleDetailPage() {
           
           if (oilChangeData.oilProduct) {
             items.push({
-              itemName: `Moy: ${oilChangeData.oilProduct.brand || ''} ${oilChangeData.oilProduct.viscosity || ''}`,
+              itemName: `Moy: ${typeof oilChangeData.oilProduct.brand === 'object' ? oilChangeData.oilProduct.brand?.name : oilChangeData.oilProduct.brand || ''} ${oilChangeData.oilProduct.viscosity || ''}`,
               quantity: oilChangeData.oilQuantityUsed || 0,
               unitPrice: oilChangeData.oilProduct.volume > 0 
                 ? (oilChangeData.oilProduct.price || 0) / oilChangeData.oilProduct.volume 
@@ -1085,8 +1088,13 @@ export default function VehicleDetailPage() {
     (screen: 'new' | 'service') => {
       const vid = params.id as string
       if (!vid) return
-      const url = `${window.location.origin}/kiosk?vehicleId=${encodeURIComponent(vid)}&screen=${screen}`
-      window.open(url, 'oilerKiosk', 'noopener,noreferrer,width=1440,height=900')
+      const url = `${window.location.origin}/kiosk?vehicleId=${encodeURIComponent(vid)}&screen=${screen}&fullscreen=1`
+      // 'oilerKiosk' nomli oynani qayta ishlatamiz: yangi oyna ochmasdan,
+      // mavjud kiosk oynasini yangi mashina ma'lumotlari bilan yangilaymiz.
+      // (noopener/noreferrer ishlatilmaydi — aks holda brauzer nomli oynani
+      // qayta ishlatmasdan har safar yangi oyna ochadi.)
+      const kioskWindow = window.open(url, 'oilerKiosk', 'width=1440,height=900')
+      kioskWindow?.focus()
     },
     [params.id]
   )
@@ -1195,15 +1203,9 @@ export default function VehicleDetailPage() {
           </Button>
           </>
           )}
-          {fromRegister && (
-            <Button type="button" variant="secondary" className="gap-2" onClick={() => openKioskWindow('new')}>
-              <Monitor className="h-4 w-4" />
-              Kiosk: yangi mijoz
-            </Button>
-          )}
           <Button type="button" variant="outline" className="gap-2 border-primary/50" onClick={() => openKioskWindow('service')}>
             <Monitor className="h-4 w-4" />
-            Kiosk: mijoz ko‘rinishi
+            Kiosk
           </Button>
         </div>
       </div>
@@ -2502,96 +2504,172 @@ export default function VehicleDetailPage() {
 
             {/* Additional Products */}
             <div className="border-b pb-6 space-y-4">
-              <h3 className="font-semibold text-foreground">Boshqa mahsulotlar (Ixtiyoriy)</h3>
+              <div className="flex items-center justify-between">
+                <h3 className="font-semibold text-foreground">Boshqa mahsulotlar (Ixtiyoriy)</h3>
+                {!showAdditionalProducts && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowAdditionalProducts(true)}
+                    className="text-primary"
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Qo'shish
+                  </Button>
+                )}
+              </div>
 
-              {/* Show Additional Products Button */}
+              {/* Custom (manual) products - always visible shortcut */}
               {!showAdditionalProducts && (
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setShowAdditionalProducts(true)}
-                  className="w-full"
-                >
-                  <Plus className="w-4 h-4 mr-2" />
-                  Boshqa mahsulotlar qo'shish
-                </Button>
+                <div className="space-y-2">
+                  {formData.customProducts.map((product, index) => (
+                    <div key={index} className="flex gap-2 items-center">
+                      <Input
+                        placeholder="Mahsulot nomi"
+                        value={product.name}
+                        onChange={(e) => {
+                          const newProducts = [...formData.customProducts]
+                          newProducts[index].name = e.target.value
+                          setFormData({ ...formData, customProducts: newProducts })
+                        }}
+                        className="flex-1"
+                      />
+                      <Input
+                        type="text"
+                        placeholder="Narxi"
+                        value={formatNumberWithSpaces(product.price)}
+                        onChange={(e) => {
+                          const numericValue = removeSpaces(e.target.value)
+                          if (/^\d*$/.test(numericValue)) {
+                            const newProducts = [...formData.customProducts]
+                            newProducts[index].price = numericValue
+                            setFormData({ ...formData, customProducts: newProducts })
+                          }
+                        }}
+                        className="w-32"
+                      />
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className="text-destructive shrink-0"
+                        onClick={() => {
+                          const newProducts = formData.customProducts.filter((_, i) => i !== index)
+                          setFormData({ ...formData, customProducts: newProducts })
+                        }}
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setFormData({
+                        ...formData,
+                        customProducts: [...formData.customProducts, { name: '', price: '' }]
+                      })
+                    }
+                  >
+                    <Plus className="w-4 h-4 mr-1" />
+                    Qo'lda mahsulot qo'shish
+                  </Button>
+                </div>
               )}
 
-              {/* Additional products from inventory */}
+              {/* Expanded: inventory search + custom products */}
               {showAdditionalProducts && (
-                <div className="space-y-3">
-                  {additionalProducts.length === 0 ? (
-                    <p className="text-sm text-muted-foreground">Qo'shimcha mahsulotlar topilmadi</p>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                      {additionalProducts.map((product) => (
-                        <label key={product._id} className="flex items-center justify-between gap-3 rounded border p-2 text-sm">
-                          <div className="flex items-center gap-2 min-w-0">
-                            <Checkbox
-                              checked={formData.additionalProducts.includes(product._id)}
-                              onCheckedChange={(checked) => handleAdditionalProductChange(product._id, checked as boolean)}
-                            />
-                            <span className="truncate">{product.name}</span>
-                          </div>
-                          <span className="text-muted-foreground shrink-0">{(product.price || 0).toLocaleString()} so'm</span>
-                        </label>
-                      ))}
+                <div className="space-y-4">
+                  {/* Inventory products with search */}
+                  <div className="border rounded-lg overflow-hidden">
+                    <div className="p-2 border-b bg-muted/30">
+                      <Input
+                        placeholder="Mahsulot nomi bo'yicha qidiring..."
+                        value={additionalProductSearch}
+                        onChange={(e) => setAdditionalProductSearch(e.target.value)}
+                        className="h-8 text-sm"
+                      />
                     </div>
-                  )}
-                  {formData.additionalProducts.length > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      Tanlangan: {formData.additionalProducts.length} ta mahsulot
-                    </div>
-                  )}
-                  {formData.customProducts.length > 0 && (
-                    <div className="text-xs text-muted-foreground">
-                      Qo'lda qo'shilgan: {formData.customProducts.length} ta mahsulot
-                    </div>
-                  )}
-                  <div className="space-y-2 border rounded p-3">
-                    <Label>Qo'lda qo'shiladigan mahsulotlar</Label>
+                    {additionalProducts.length === 0 ? (
+                      <p className="text-sm text-muted-foreground p-3">Omborda mahsulotlar topilmadi</p>
+                    ) : (
+                      <div className="max-h-48 overflow-y-auto divide-y">
+                        {additionalProducts
+                          .filter((p) =>
+                            !additionalProductSearch ||
+                            p.name.toLowerCase().includes(additionalProductSearch.toLowerCase())
+                          )
+                          .map((product) => {
+                            const isSelected = formData.additionalProducts.includes(product._id)
+                            return (
+                              <label
+                                key={product._id}
+                                className={`flex items-center justify-between gap-3 px-3 py-2 text-sm cursor-pointer transition-colors ${isSelected ? 'bg-primary/10' : 'hover:bg-muted/50'}`}
+                              >
+                                <div className="flex items-center gap-2 min-w-0">
+                                  <Checkbox
+                                    checked={isSelected}
+                                    onCheckedChange={(checked) => handleAdditionalProductChange(product._id, checked as boolean)}
+                                  />
+                                  <span className="truncate">{product.name}</span>
+                                </div>
+                                <span className="text-muted-foreground shrink-0 text-xs">{(product.price || 0).toLocaleString()} so'm</span>
+                              </label>
+                            )
+                          })}
+                      </div>
+                    )}
+                    {formData.additionalProducts.length > 0 && (
+                      <div className="px-3 py-1.5 border-t bg-primary/5 text-xs text-primary font-medium">
+                        Tanlangan: {formData.additionalProducts.length} ta mahsulot
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Manual custom products */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium">Qo'lda qo'shish (ombordan tashqari)</Label>
                     {formData.customProducts.map((product, index) => (
-                      <div key={index} className="grid grid-cols-12 gap-2 items-end">
-                        <div className="col-span-7">
-                          <Input
-                            placeholder="Masalan: Tormoz suyuqligi"
-                            value={product.name}
-                            onChange={(e) => {
+                      <div key={index} className="flex gap-2 items-center">
+                        <Input
+                          placeholder="Mahsulot nomi"
+                          value={product.name}
+                          onChange={(e) => {
+                            const newProducts = [...formData.customProducts]
+                            newProducts[index].name = e.target.value
+                            setFormData({ ...formData, customProducts: newProducts })
+                          }}
+                          className="flex-1"
+                        />
+                        <Input
+                          type="text"
+                          placeholder="Narxi"
+                          value={formatNumberWithSpaces(product.price)}
+                          onChange={(e) => {
+                            const numericValue = removeSpaces(e.target.value)
+                            if (/^\d*$/.test(numericValue)) {
                               const newProducts = [...formData.customProducts]
-                              newProducts[index].name = e.target.value
+                              newProducts[index].price = numericValue
                               setFormData({ ...formData, customProducts: newProducts })
-                            }}
-                          />
-                        </div>
-                        <div className="col-span-4">
-                          <Input
-                            type="text"
-                            placeholder="50 000"
-                            value={formatNumberWithSpaces(product.price)}
-                            onChange={(e) => {
-                              const numericValue = removeSpaces(e.target.value)
-                              if (/^\d*$/.test(numericValue)) {
-                                const newProducts = [...formData.customProducts]
-                                newProducts[index].price = numericValue
-                                setFormData({ ...formData, customProducts: newProducts })
-                              }
-                            }}
-                          />
-                        </div>
-                        <div className="col-span-1">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="text-destructive"
-                            onClick={() => {
-                              const newProducts = formData.customProducts.filter((_, i) => i !== index)
-                              setFormData({ ...formData, customProducts: newProducts })
-                            }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
-                        </div>
+                            }
+                          }}
+                          className="w-32"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="text-destructive shrink-0"
+                          onClick={() => {
+                            const newProducts = formData.customProducts.filter((_, i) => i !== index)
+                            setFormData({ ...formData, customProducts: newProducts })
+                          }}
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
                       </div>
                     ))}
                     <Button
@@ -2604,12 +2682,21 @@ export default function VehicleDetailPage() {
                           customProducts: [...formData.customProducts, { name: '', price: '' }]
                         })
                       }
-                      className="w-full"
                     >
-                      <Plus className="w-4 h-4 mr-2" />
+                      <Plus className="w-4 h-4 mr-1" />
                       Qo'lda mahsulot qo'shish
                     </Button>
                   </div>
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="text-muted-foreground"
+                    onClick={() => setShowAdditionalProducts(false)}
+                  >
+                    Yopish
+                  </Button>
                 </div>
               )}
             </div>
@@ -2845,20 +2932,34 @@ export default function VehicleDetailPage() {
                               lastServiceData.oilProductCustomerProvided || lastServiceData.oilProductCustomerProvidedDetails
                                 ? (lastServiceData.oilProductCustomerProvidedDetails || 'Mijoz moy')
                                 : typeof lastServiceData.oilProduct === 'object' && lastServiceData.oilProduct.viscosity
-                                ? `${lastServiceData.oilProduct.brand || 'N/A'} ${lastServiceData.oilProduct.viscosity} ${lastServiceData.oilProduct.apiGrade || ''} (${lastServiceData.oilQuantityUsed}L)`.trim()
+                                ? `${typeof lastServiceData.oilProduct.brand === 'object' ? lastServiceData.oilProduct.brand?.name : lastServiceData.oilProduct.brand || 'N/A'} ${lastServiceData.oilProduct.viscosity} ${lastServiceData.oilProduct.apiGrade || ''} (${lastServiceData.oilQuantityUsed}L)`.trim()
                                 : 'N/A'
                             }
                           </p>
                         )}
-                        {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided || lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && (
-                          <p className="text-[9px]">
-                            <strong>Filterlar:</strong>{' '}
-                            {(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && 'Moy ✓'}{(lastServiceData?.oilFilter || lastServiceData?.oilFilterCustomerProvided) && (lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided || lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
-                            {(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && 'Havo ✓'}{(lastServiceData?.airFilter || lastServiceData?.airFilterCustomerProvided) && (lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided || lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
-                            {(lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided) && 'Salon ✓'}{(lastServiceData?.cabinFilter || lastServiceData?.cabinFilterCustomerProvided) && (lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && ', '}
-                            {(lastServiceData?.fuelFilter || lastServiceData?.fuelFilterCustomerProvided) && 'Yoqilg\'i ✓'}
-                          </p>
-                        )}
+                        {(() => {
+                          const filterName = (filter: any, customerProvided: boolean, details?: string) => {
+                            if (customerProvided) return details || 'Mijoz'
+                            if (!filter || typeof filter !== 'object') return null
+                            const label = filter.displayName
+                              || `${filter.brandName || filter.brand || ''} ${filter.partNumber || ''}`.trim()
+                              || filter.name
+                            return label || '✓'
+                          }
+                          const rows: Array<{ label: string; value: string }> = []
+                          const oilF = filterName(lastServiceData?.oilFilter, lastServiceData?.oilFilterCustomerProvided, lastServiceData?.oilFilterCustomerProvidedDetails)
+                          if (oilF) rows.push({ label: 'Moy filter', value: oilF })
+                          const airF = filterName(lastServiceData?.airFilter, lastServiceData?.airFilterCustomerProvided, lastServiceData?.airFilterCustomerProvidedDetails)
+                          if (airF) rows.push({ label: 'Havo filter', value: airF })
+                          const cabinF = filterName(lastServiceData?.cabinFilter, lastServiceData?.cabinFilterCustomerProvided, lastServiceData?.cabinFilterCustomerProvidedDetails)
+                          if (cabinF) rows.push({ label: 'Salon filter', value: cabinF })
+                          const fuelF = filterName(lastServiceData?.fuelFilter, lastServiceData?.fuelFilterCustomerProvided, lastServiceData?.fuelFilterCustomerProvidedDetails)
+                          if (fuelF) rows.push({ label: 'Yoqilg\'i filter', value: fuelF })
+                          if (rows.length === 0) return null
+                          return rows.map((r, i) => (
+                            <p key={i} className="text-[9px]"><strong>{r.label}:</strong> {r.value}</p>
+                          ))
+                        })()}
                         {lastServiceData?.employees && lastServiceData.employees.length > 0 && (
                           <p className="text-[9px]">
                             <strong>Xodim:</strong> {lastServiceData.employees.map((e: any) => typeof e === 'object' && e.name ? e.name : 'N/A').join(', ')}

@@ -187,4 +187,43 @@ export class FilterService {
       .lean()
       .sort({ stock: 1 });
   }
+
+  async bulkImport(
+    tenantId: string,
+    rows: CreateFilterData[]
+  ): Promise<{ created: number; skipped: number; errors: { row: number; name: string; reason: string }[] }> {
+    let settings = await Settings.findOne({ tenant: tenantId });
+    if (!settings) settings = await Settings.create({ tenant: tenantId });
+    const exchangeRate = settings.exchangeRate;
+
+    let created = 0;
+    let skipped = 0;
+    const errors: { row: number; name: string; reason: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const data = rows[i];
+      const label = `${data.brandName} ${data.partNumber}`;
+      try {
+        const existing = await Filter.findOne({
+          tenant: tenantId,
+          brandName: data.brandName,
+          filterType: data.filterType,
+          partNumber: data.partNumber,
+        });
+        if (existing) { skipped++; continue; }
+
+        await Filter.create({
+          tenant: tenantId,
+          ...data,
+          exchangeRateUsed: exchangeRate,
+          reorderLevel: data.reorderLevel ?? 10,
+        });
+        created++;
+      } catch {
+        errors.push({ row: i + 2, name: label, reason: 'Saqlashda xatolik' });
+      }
+    }
+
+    return { created, skipped, errors };
+  }
 }

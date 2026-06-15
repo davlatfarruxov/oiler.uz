@@ -12,8 +12,10 @@ import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
-import { AlertTriangle, Plus, AlertCircle, TrendingDown, Loader2, Pencil, Trash2, Printer } from 'lucide-react'
-import style from 'styled-jsx/style'
+import { AlertTriangle, Plus, AlertCircle, TrendingDown, Loader2, Pencil, Trash2, Printer, Search, FileDown, FileUp } from 'lucide-react'
+import { InventoryExcelImportDialog, exportInventoryToExcel, downloadInventoryTemplate } from '@/components/InventoryExcelImport'
+import { FiltersExcelImportDialog, exportFiltersToExcel } from '@/components/FiltersExcelImport'
+import { OilProductsExcelImportDialog, exportOilProductsToExcel } from '@/components/OilProductsExcelImport'
 
 
 export default function InventoryPage() {
@@ -77,6 +79,13 @@ export default function InventoryPage() {
     stock: '',
     reorderLevel: '10'
   })
+
+  const [searchProducts, setSearchProducts] = useState('')
+  const [searchOilVariants, setSearchOilVariants] = useState('')
+  const [searchFilters, setSearchFilters] = useState('')
+  const [openImportDialog, setOpenImportDialog] = useState(false)
+  const [openFiltersImportDialog, setOpenFiltersImportDialog] = useState(false)
+  const [openOilImportDialog, setOpenOilImportDialog] = useState(false)
 
   useEffect(() => {
     fetchInventory()
@@ -501,6 +510,28 @@ export default function InventoryPage() {
   const oils = getItemsByType('oil')
   const products = getItemsByType('other')
 
+  const filteredProducts = useMemo(() => {
+    if (!searchProducts.trim()) return products
+    const q = searchProducts.toLowerCase()
+    return products.filter((p) => p.name?.toLowerCase().includes(q))
+  }, [products, searchProducts])
+
+  const filteredOilVariants = useMemo(() => {
+    if (!searchOilVariants.trim()) return brandProducts
+    const q = searchOilVariants.toLowerCase()
+    return brandProducts.filter((p) =>
+      `${p.viscosity} ${p.apiGrade} ${p.volume}`.toLowerCase().includes(q)
+    )
+  }, [brandProducts, searchOilVariants])
+
+  const filteredBrandFilters = useMemo(() => {
+    if (!searchFilters.trim()) return brandFilters
+    const q = searchFilters.toLowerCase()
+    return brandFilters.filter((f) =>
+      `${f.partNumber} ${f.quality} ${(f.compatibleVehicles || []).join(' ')}`.toLowerCase().includes(q)
+    )
+  }, [brandFilters, searchFilters])
+
   const permissions = useAppSelector((s) => s.auth.user?.permissions)
   const can = useCanShowSection()
   const showOilTab = can('ui.inventory.tab_oil')
@@ -618,6 +649,17 @@ export default function InventoryPage() {
 
             {showOilTab && (
             <TabsContent value="oil-products" className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setOpenOilImportDialog(true)} className="gap-1">
+                  <FileUp className="w-4 h-4" />Excel import
+                </Button>
+                <Button variant="outline" size="sm" onClick={async () => {
+                  const res = await api.get('/oil-products')
+                  exportOilProductsToExcel(oilBrands, res.data.data)
+                }} className="gap-1">
+                  <FileDown className="w-4 h-4" />Excel export
+                </Button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Brands list */}
                 <Card>
@@ -693,6 +735,17 @@ export default function InventoryPage() {
                         </Button>
                       )}
                     </div>
+                    {selectedBrand && brandProducts.length > 0 && (
+                      <div className="relative mt-2">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Qidirish (qovushqoqlik, API, hajm...)"
+                          value={searchOilVariants}
+                          onChange={(e) => setSearchOilVariants(e.target.value)}
+                          className="pl-8 h-9"
+                        />
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {!selectedBrand ? (
@@ -701,7 +754,7 @@ export default function InventoryPage() {
                       <p className="text-center text-muted-foreground py-8">Hali variantlar yo'q. Birinchi variantni qo'shing!</p>
                     ) : (
                       <div className="space-y-3">
-                        {brandProducts.map((product) => {
+                        {filteredOilVariants.map((product) => {
                           // Calculate cost in UZS
                           const costPrice = product.costPrice || 0;
                           const costCurrency = product.costCurrency || 'UZS';
@@ -791,6 +844,14 @@ export default function InventoryPage() {
 
             {showFiltersTab && (
             <TabsContent value="filters" className="space-y-4">
+              <div className="flex flex-wrap gap-2">
+                <Button variant="outline" size="sm" onClick={() => setOpenFiltersImportDialog(true)} className="gap-1">
+                  <FileUp className="w-4 h-4" />Excel import
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportFiltersToExcel(filters)} className="gap-1">
+                  <FileDown className="w-4 h-4" />Excel export
+                </Button>
+              </div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 {/* Filter Brands list */}
                 <Card>
@@ -862,6 +923,17 @@ export default function InventoryPage() {
                         Filter qo'shish
                       </Button>
                     </div>
+                    {selectedFilterBrand && brandFilters.length > 0 && (
+                      <div className="relative mt-2">
+                        <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Qidirish (raqam, sifat, mashina...)"
+                          value={searchFilters}
+                          onChange={(e) => setSearchFilters(e.target.value)}
+                          className="pl-8 h-9"
+                        />
+                      </div>
+                    )}
                   </CardHeader>
                   <CardContent>
                     {!selectedFilterBrand ? (
@@ -870,7 +942,7 @@ export default function InventoryPage() {
                       <p className="text-center text-muted-foreground py-8">Hali filterlar yo'q. Birinchi filterni qo'shing!</p>
                     ) : (
                       <div className="space-y-3">
-                        {brandFilters.map((filter) => {
+                        {filteredBrandFilters.map((filter) => {
                           const costPrice = filter.costPrice || 0
                           const costCurrency = filter.costCurrency || 'UZS'
                           const exchangeRate = filter.exchangeRateUsed || 1
@@ -1002,17 +1074,39 @@ export default function InventoryPage() {
 
             {showProductsTab && (
             <TabsContent value="products" className="space-y-4">
-              <Button onClick={() => openAddDialog('other')} className="gap-2 mb-4">
-                <Plus className="w-4 h-4" />
-                Mahsulot qo'shish
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button onClick={() => openAddDialog('other')} className="gap-2">
+                  <Plus className="w-4 h-4" />
+                  Mahsulot qo'shish
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => setOpenImportDialog(true)} className="gap-1">
+                  <FileUp className="w-4 h-4" />
+                  Excel import
+                </Button>
+                <Button variant="outline" size="sm" onClick={() => exportInventoryToExcel(products)} disabled={products.length === 0} className="gap-1">
+                  <FileDown className="w-4 h-4" />
+                  Excel export
+                </Button>
+                <div className="relative ml-auto">
+                  <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    placeholder="Mahsulot qidirish..."
+                    value={searchProducts}
+                    onChange={(e) => setSearchProducts(e.target.value)}
+                    className="pl-8 h-9 w-64"
+                  />
+                </div>
+              </div>
+              {searchProducts && (
+                <p className="text-sm text-muted-foreground">{filteredProducts.length} ta topildi</p>
+              )}
               {isLoading ? (
                 <div className="flex justify-center py-8">
                   <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
                 </div>
               ) : (
                 <InventoryTable
-                  items={products}
+                  items={filteredProducts}
                   onEdit={openEditDialog}
                   onDelete={handleDeleteItem}
                   showReorderLevel={true}
@@ -1038,7 +1132,7 @@ export default function InventoryPage() {
               <Input
                 id="name"
                 value={newItem.name}
-                onChange={(e) => setNewItem({ ...newItem, name: e.target.value })}
+                onChange={(e) => setNewItem(prev => ({ ...prev, name: e.target.value }))}
                 required
               />
             </div>
@@ -1050,7 +1144,7 @@ export default function InventoryPage() {
                   type="number"
                   step="0.01"
                   value={newItem.costPrice}
-                  onChange={(e) => setNewItem({ ...newItem, costPrice: e.target.value })}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, costPrice: e.target.value }))}
                   placeholder="25000"
                 />
               </div>
@@ -1058,14 +1152,14 @@ export default function InventoryPage() {
                 <Label htmlFor="costCurrency">Valyuta</Label>
                 <Select
                   value={newItem.costCurrency}
-                  onValueChange={(value: 'USD' | 'UZS') => setNewItem({ ...newItem, costCurrency: value })}
+                  onValueChange={(value: 'USD' | 'UZS') => setNewItem(prev => ({ ...prev, costCurrency: value }))}
                 >
                   <SelectTrigger id="costCurrency">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UZS">UZS</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="UZS">UZS (so'm)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1076,7 +1170,7 @@ export default function InventoryPage() {
                   type="number"
                   step="0.01"
                   value={newItem.price}
-                  onChange={(e) => setNewItem({ ...newItem, price: e.target.value })}
+                  onChange={(e) => setNewItem(prev => ({ ...prev, price: e.target.value }))}
                   required
                 />
               </div>
@@ -1087,7 +1181,7 @@ export default function InventoryPage() {
                 id="stock"
                 type="number"
                 value={newItem.stock}
-                onChange={(e) => setNewItem({ ...newItem, stock: e.target.value })}
+                onChange={(e) => setNewItem(prev => ({ ...prev, stock: e.target.value }))}
                 required
               />
             </div>
@@ -1097,7 +1191,7 @@ export default function InventoryPage() {
                 id="reorder"
                 type="number"
                 value={newItem.reorderLevel}
-                onChange={(e) => setNewItem({ ...newItem, reorderLevel: e.target.value })}
+                onChange={(e) => setNewItem(prev => ({ ...prev, reorderLevel: e.target.value }))}
               />
             </div>
             <div className="flex gap-2">
@@ -1179,7 +1273,7 @@ export default function InventoryPage() {
                 <Input
                   id="viscosity"
                   value={newVariant.viscosity}
-                  onChange={(e) => setNewVariant({ ...newVariant, viscosity: e.target.value })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, viscosity: e.target.value }))}
                   placeholder="10W-40, 5W-30..."
                   required
                 />
@@ -1189,7 +1283,7 @@ export default function InventoryPage() {
                 <Input
                   id="apiGrade"
                   value={newVariant.apiGrade}
-                  onChange={(e) => setNewVariant({ ...newVariant, apiGrade: e.target.value.toUpperCase() })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, apiGrade: e.target.value.toUpperCase() }))}
                   placeholder="SN, SL, SP..."
                   required
                 />
@@ -1203,7 +1297,7 @@ export default function InventoryPage() {
                   type="number"
                   step="0.5"
                   value={newVariant.volume}
-                  onChange={(e) => setNewVariant({ ...newVariant, volume: e.target.value })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, volume: e.target.value }))}
                   placeholder="4"
                   required
                 />
@@ -1214,7 +1308,7 @@ export default function InventoryPage() {
                   id="variantStock"
                   type="number"
                   value={newVariant.stock}
-                  onChange={(e) => setNewVariant({ ...newVariant, stock: e.target.value })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, stock: e.target.value }))}
                   placeholder="50"
                   required
                 />
@@ -1227,20 +1321,20 @@ export default function InventoryPage() {
                   id="costPrice"
                   type="number"
                   value={newVariant.costPrice}
-                  onChange={(e) => setNewVariant({ ...newVariant, costPrice: e.target.value })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, costPrice: e.target.value }))}
                   placeholder="25000"
                   required
                 />
               </div>
               <div>
                 <Label htmlFor="costCurrency">Valyuta *</Label>
-                <Select value={newVariant.costCurrency} onValueChange={(value) => setNewVariant({ ...newVariant, costCurrency: value })}>
+                <Select value={newVariant.costCurrency} onValueChange={(value: 'USD' | 'UZS') => setNewVariant(prev => ({ ...prev, costCurrency: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="UZS">UZS</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
+                    <SelectItem value="UZS">UZS (so'm)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1250,7 +1344,7 @@ export default function InventoryPage() {
                   id="variantPrice"
                   type="number"
                   value={newVariant.price}
-                  onChange={(e) => setNewVariant({ ...newVariant, price: e.target.value })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, price: e.target.value }))}
                   placeholder="30000"
                   required
                 />
@@ -1263,7 +1357,7 @@ export default function InventoryPage() {
                   id="reorderLevel"
                   type="number"
                   value={newVariant.reorderLevel}
-                  onChange={(e) => setNewVariant({ ...newVariant, reorderLevel: e.target.value })}
+                  onChange={(e) => setNewVariant(prev => ({ ...prev, reorderLevel: e.target.value }))}
                   placeholder="10"
                 />
               </div>
@@ -1300,14 +1394,14 @@ export default function InventoryPage() {
                 <Label>Brend *</Label>
                 <Input
                   value={newFilter.brandName}
-                  onChange={(e) => setNewFilter({ ...newFilter, brandName: e.target.value })}
+                  onChange={(e) => setNewFilter(prev => ({ ...prev, brandName: e.target.value }))}
                   placeholder="Mann, Bosch, Mahle"
                   required
                 />
               </div>
               <div>
                 <Label>Filter turi *</Label>
-                <Select value={newFilter.filterType} onValueChange={(value) => setNewFilter({ ...newFilter, filterType: value })}>
+                <Select value={newFilter.filterType} onValueChange={(value) => setNewFilter(prev => ({ ...prev, filterType: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -1324,51 +1418,51 @@ export default function InventoryPage() {
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Qism raqami *</Label>
-                <Input value={newFilter.partNumber} onChange={(e) => setNewFilter({ ...newFilter, partNumber: e.target.value })} placeholder="W 712/75" required />
+                <Input value={newFilter.partNumber} onChange={(e) => setNewFilter(prev => ({ ...prev, partNumber: e.target.value }))} placeholder="W 712/75" required />
               </div>
               <div>
                 <Label>Sifat *</Label>
-                <Input value={newFilter.quality} onChange={(e) => setNewFilter({ ...newFilter, quality: e.target.value })} placeholder="Premium, Standart, Ekonom" required />
+                <Input value={newFilter.quality} onChange={(e) => setNewFilter(prev => ({ ...prev, quality: e.target.value }))} placeholder="Premium, Standart, Ekonom" required />
               </div>
             </div>
 
             <div>
               <Label>Mos keladigan mashinalar</Label>
-              <Input value={newFilter.compatibleVehicles} onChange={(e) => setNewFilter({ ...newFilter, compatibleVehicles: e.target.value })} placeholder="Toyota Camry, Honda Accord" />
+              <Input value={newFilter.compatibleVehicles} onChange={(e) => setNewFilter(prev => ({ ...prev, compatibleVehicles: e.target.value }))} placeholder="Toyota Camry, Honda Accord" />
               <p className="text-xs text-muted-foreground mt-1">Vergul bilan ajratilgan</p>
             </div>
 
             <div className="grid grid-cols-3 gap-4">
               <div>
                 <Label>Xarajat narxi *</Label>
-                <Input type="number" step="0.01" value={newFilter.costPrice} onChange={(e) => setNewFilter({ ...newFilter, costPrice: e.target.value })} required />
+                <Input type="number" step="0.01" value={newFilter.costPrice} onChange={(e) => setNewFilter(prev => ({ ...prev, costPrice: e.target.value }))} required />
               </div>
               <div>
                 <Label>Valyuta *</Label>
-                <Select value={newFilter.costCurrency} onValueChange={(value: 'USD' | 'UZS') => setNewFilter({ ...newFilter, costCurrency: value })}>
+                <Select value={newFilter.costCurrency} onValueChange={(value: 'USD' | 'UZS') => setNewFilter(prev => ({ ...prev, costCurrency: value }))}>
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="UZS">UZS</SelectItem>
+                    <SelectItem value="UZS">UZS (so'm)</SelectItem>
+                    <SelectItem value="USD">USD ($)</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
               <div>
                 <Label>Sotish narxi (UZS) *</Label>
-                <Input type="number" value={newFilter.price} onChange={(e) => setNewFilter({ ...newFilter, price: e.target.value })} required />
+                <Input type="number" value={newFilter.price} onChange={(e) => setNewFilter(prev => ({ ...prev, price: e.target.value }))} required />
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Omborda *</Label>
-                <Input type="number" value={newFilter.stock} onChange={(e) => setNewFilter({ ...newFilter, stock: e.target.value })} required />
+                <Input type="number" value={newFilter.stock} onChange={(e) => setNewFilter(prev => ({ ...prev, stock: e.target.value }))} required />
               </div>
               <div>
                 <Label>Qayta buyurtma darajasi</Label>
-                <Input type="number" value={newFilter.reorderLevel} onChange={(e) => setNewFilter({ ...newFilter, reorderLevel: e.target.value })} />
+                <Input type="number" value={newFilter.reorderLevel} onChange={(e) => setNewFilter(prev => ({ ...prev, reorderLevel: e.target.value }))} />
               </div>
             </div>
 
@@ -1465,6 +1559,24 @@ export default function InventoryPage() {
         </DialogContent>
       </Dialog>
 
+      <InventoryExcelImportDialog
+        open={openImportDialog}
+        onOpenChange={setOpenImportDialog}
+        onSuccess={() => { fetchInventory(); fetchLowStock() }}
+      />
+
+      <FiltersExcelImportDialog
+        open={openFiltersImportDialog}
+        onOpenChange={setOpenFiltersImportDialog}
+        onSuccess={() => fetchFilters()}
+      />
+
+      <OilProductsExcelImportDialog
+        open={openOilImportDialog}
+        onOpenChange={setOpenOilImportDialog}
+        onSuccess={() => { fetchOilBrands(); if (selectedBrand) fetchBrandProducts(selectedBrand._id) }}
+      />
+
       {/* Print Styles */}
       <style dangerouslySetInnerHTML={{
         __html: `
@@ -1476,10 +1588,13 @@ export default function InventoryPage() {
             padding: 3mm;
             font-family: Arial, sans-serif;
             background-color: white;
-           
+            color: #000;
             box-sizing: border-box;
           }
-          
+          .price-label-print * {
+            color: #000 !important;
+          }
+
           @media print {
             body * {
               visibility: hidden !important;
@@ -1487,6 +1602,9 @@ export default function InventoryPage() {
             .price-label-print,
             .price-label-print * {
               visibility: visible !important;
+              color: #000 !important;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
             }
             .price-label-print {
               position: absolute !important;
@@ -1500,6 +1618,7 @@ export default function InventoryPage() {
               padding: 3mm !important;
               font-family: Arial, sans-serif !important;
               background-color: white !important;
+              color: #000 !important;
               box-sizing: border-box !important;
             }
             @page {

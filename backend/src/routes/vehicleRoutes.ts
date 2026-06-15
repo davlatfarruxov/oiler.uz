@@ -12,7 +12,6 @@ const vehicleValidation = [
   body('plateNumber').notEmpty().withMessage('Plate number is required'),
   body('brand').notEmpty().withMessage('Vehicle brand is required'),
   body('vehicleModel').notEmpty().withMessage('Vehicle model is required'),
-  body('engineType').notEmpty().withMessage('Engine type is required'),
   body('customerName').notEmpty().withMessage('Customer name is required'),
   body('customerPhone').notEmpty().withMessage('Customer phone is required')
 ];

@@ -40,13 +40,6 @@ export function EmployeeCommissionControl({
 
   // Initialize commissions when props change
   useEffect(() => {
-    console.log('EmployeeCommissionControl useEffect triggered:', {
-      selectedEmployees,
-      totalServicePrice,
-      laborCost,
-      commissions,
-      localCommissions
-    })
     
     if (selectedEmployees.length === 0) {
       setLocalCommissions([])
@@ -85,7 +78,6 @@ export function EmployeeCommissionControl({
       }
     })
     
-    console.log('Setting new commissions:', newCommissions)
     setLocalCommissions(newCommissions)
     onCommissionsChange(newCommissions)
   }, [selectedEmployees, employees, laborCost])
@@ -120,7 +112,6 @@ export function EmployeeCommissionControl({
         : commission
     )
     
-    console.log('Rate changed, updating commissions:', updatedCommissions)
     setLocalCommissions(updatedCommissions)
     onCommissionsChange(updatedCommissions)
   }
@@ -135,7 +126,6 @@ export function EmployeeCommissionControl({
         : commission
     )
     
-    console.log('Amount changed, updating commissions:', updatedCommissions)
     setLocalCommissions(updatedCommissions)
     onCommissionsChange(updatedCommissions)
   }

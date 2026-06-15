@@ -7,8 +7,30 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Loader2, ArrowLeft } from 'lucide-react'
+
+// O'zbekistonda eng ko'p uchraydigan mashinalar (brend → modellar)
+const UZ_CARS: Record<string, string[]> = {
+  'Chevrolet': ['Spark', 'Cobalt', 'Nexia', 'Nexia 2', 'Nexia 3', 'Gentra', 'Lacetti', 'Malibu', 'Malibu 2', 'Captiva', 'Tracker', 'Onix', 'Tahoe', 'Equinox', 'Traverse', 'Trailblazer', 'Orlando', 'Epica', 'Matiz', 'Damas', 'Labo'],
+  'Daewoo': ['Matiz', 'Nexia', 'Gentra', 'Damas', 'Labo', 'Tico', 'Nubira', 'Lacetti'],
+  'Ravon': ['R2', 'R3', 'R4', 'Nexia R3', 'Gentra', 'Matiz'],
+  'BYD': ['Chazor', 'Song Plus', 'Han', 'Seal', 'Yuan Plus', 'Dolphin'],
+  'Toyota': ['Camry', 'Corolla', 'Land Cruiser', 'Land Cruiser Prado', 'RAV4', 'Highlander', 'Avalon', 'Yaris', 'Fortuner', 'Hilux'],
+  'Kia': ['K5', 'Sportage', 'Sorento', 'Cerato', 'Optima', 'Sonet', 'Seltos', 'Rio', 'Carnival'],
+  'Hyundai': ['Sonata', 'Elantra', 'Tucson', 'Santa Fe', 'Accent', 'Creta', 'Palisade', 'Solaris'],
+  'Lada (VAZ)': ['2106', '2107', '2110', '2114', 'Niva', 'Granta', 'Vesta', 'Largus', 'Priora'],
+  'Nissan': ['Almera', 'Qashqai', 'X-Trail', 'Patrol', 'Sunny', 'Teana'],
+  'Volkswagen': ['Polo', 'Passat', 'Tiguan', 'Jetta', 'Touareg'],
+  'Mercedes-Benz': ['E-Class', 'C-Class', 'S-Class', 'GLE', 'GLС', 'Sprinter', 'Vito'],
+  'BMW': ['3 Series', '5 Series', '7 Series', 'X5', 'X6', 'X3'],
+  'Mitsubishi': ['Lancer', 'Outlander', 'Pajero', 'ASX', 'Montero'],
+  'Honda': ['Civic', 'Accord', 'CR-V', 'Pilot'],
+  'Ssangyong': ['Actyon', 'Rexton', 'Korando', 'Tivoli'],
+  'GAZ': ['Gazel', 'Gazel Next', 'Sobol'],
+  'Isuzu': ['D-Max', 'NQR', 'NPR'],
+}
+
+const CAR_BRANDS = Object.keys(UZ_CARS)
 
 export default function AddVehiclePage() {
   const router = useRouter()
@@ -18,7 +40,6 @@ export default function AddVehiclePage() {
     plateNumber: searchParams.get('plate') || '',
     brand: '',
     vehicleModel: '',
-    engineType: 'petrol',
     customerName: '',
     customerPhone: ''
   })
@@ -77,19 +98,19 @@ export default function AddVehiclePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
 
-    // Validate plate number length
+    // Davlat raqami uzunligini tekshirish
     if (formData.plateNumber.length !== 8) {
-      alert('Plate number must be exactly 8 characters')
+      alert("Davlat raqami aniq 8 ta belgidan iborat bo'lishi kerak")
       return
     }
 
     try {
       setIsSaving(true)
       const response = await api.post('/vehicles', formData)
-      alert('Vehicle added successfully!')
+      alert("Mashina muvaffaqiyatli qo'shildi!")
       router.push(`/dashboard/service/${response.data.data._id}?from=register`)
     } catch (error: any) {
-      alert(error.response?.data?.message || 'Failed to add vehicle')
+      alert(error.response?.data?.message || "Mashina qo'shishda xatolik yuz berdi")
     } finally {
       setIsSaving(false)
     }
@@ -102,20 +123,20 @@ export default function AddVehiclePage() {
           <ArrowLeft className="w-5 h-5" />
         </Button>
         <div>
-          <h1 className="text-3xl font-bold text-foreground">Add New Vehicle</h1>
-          <p className="text-muted-foreground mt-1">Enter vehicle and customer details</p>
+          <h1 className="text-3xl font-bold text-foreground">Yangi mashina qo'shish</h1>
+          <p className="text-muted-foreground mt-1">Mashina va mijoz ma'lumotlarini kiriting</p>
         </div>
       </div>
 
       <Card>
         <CardHeader>
-          <CardTitle>Vehicle Information</CardTitle>
-          <CardDescription>Fill in all required fields</CardDescription>
+          <CardTitle>Mashina ma'lumotlari</CardTitle>
+          <CardDescription>Barcha majburiy maydonlarni to'ldiring</CardDescription>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <Label htmlFor="plateNumber">License Plate Number *</Label>
+              <Label htmlFor="plateNumber">Davlat raqami *</Label>
               <Input
                 id="plateNumber"
                 placeholder="01A234BC"
@@ -126,65 +147,62 @@ export default function AddVehiclePage() {
                 className="text-3xl font-bold text-center tracking-widest mt-2"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                {formData.plateNumber.length}/8 characters
+                {formData.plateNumber.length}/8 ta belgi
               </p>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="brand">Brand *</Label>
+                <Label htmlFor="brand">Marka *</Label>
                 <Input
                   id="brand"
+                  list="car-brands"
                   value={formData.brand}
-                  onChange={(e) => setFormData({ ...formData, brand: e.target.value })}
-                  placeholder="Toyota"
+                  onChange={(e) => setFormData({ ...formData, brand: e.target.value, vehicleModel: '' })}
+                  placeholder="Tanlang yoki yozing (masalan: Chevrolet)"
+                  autoComplete="off"
                   required
                 />
+                <datalist id="car-brands">
+                  {CAR_BRANDS.map((b) => (
+                    <option key={b} value={b} />
+                  ))}
+                </datalist>
               </div>
               <div>
                 <Label htmlFor="vehicleModel">Model *</Label>
                 <Input
                   id="vehicleModel"
+                  list="car-models"
                   value={formData.vehicleModel}
                   onChange={(e) => setFormData({ ...formData, vehicleModel: e.target.value })}
-                  placeholder="Camry"
+                  placeholder="Tanlang yoki yozing (masalan: Cobalt)"
+                  autoComplete="off"
                   required
                 />
+                <datalist id="car-models">
+                  {(UZ_CARS[formData.brand] || []).map((m) => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
               </div>
             </div>
 
-            <div>
-              <Label htmlFor="engineType">Engine Type *</Label>
-              <Select value={formData.engineType} onValueChange={(value) => setFormData({ ...formData, engineType: value })}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="petrol">Petrol</SelectItem>
-                  <SelectItem value="diesel">Diesel</SelectItem>
-                  <SelectItem value="hybrid">Hybrid</SelectItem>
-                  <SelectItem value="electric">Electric</SelectItem>
-                  <SelectItem value="propane">Propan</SelectItem>
-                  <SelectItem value="methane">Metan</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <div className="border-t pt-6">
-              <h3 className="font-semibold mb-4">Customer Information</h3>
+              <h3 className="font-semibold mb-4">Mijoz ma'lumotlari</h3>
               <div className="space-y-4">
                 <div>
-                  <Label htmlFor="customerName">Customer Name *</Label>
+                  <Label htmlFor="customerName">Mijoz ismi *</Label>
                   <Input
                     id="customerName"
                     value={formData.customerName}
                     onChange={(e) => setFormData({ ...formData, customerName: e.target.value })}
-                    placeholder="John Doe"
+                    placeholder="Masalan: Alisher Karimov"
                     required
                   />
                 </div>
                 <div>
-                  <Label htmlFor="customerPhone">Phone Number *</Label>
+                  <Label htmlFor="customerPhone">Telefon raqami *</Label>
                   <Input
                     id="customerPhone"
                     value={formData.customerPhone}
@@ -205,14 +223,14 @@ export default function AddVehiclePage() {
                 {isSaving ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Adding Vehicle...
+                    Qo'shilmoqda...
                   </>
                 ) : (
-                  'Add Vehicle'
+                  "Mashinani qo'shish"
                 )}
               </Button>
               <Button type="button" variant="outline" onClick={() => router.back()}>
-                Cancel
+                Bekor qilish
               </Button>
             </div>
           </form>

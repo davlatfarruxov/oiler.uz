@@ -103,12 +103,19 @@ export function ServicePrintReceipt({
     }
     const oil = lastServiceData.oilProduct
     if (!oil) return lastServiceData.oilProductName || '—'
-    const oilName = `${oil.brand || ''} ${oil.viscosity || ''} ${oil.apiGrade || ''}`.trim()
+    const oilBrand = typeof oil.brand === 'object' ? oil.brand?.name : oil.brand
+    const oilName = `${oilBrand || ''} ${oil.viscosity || ''} ${oil.apiGrade || ''}`.trim()
     const qty = lastServiceData.oilQuantityUsed ? ` (${lastServiceData.oilQuantityUsed}L)` : ''
     return `${oilName}${qty}`.trim()
   })()
   const stickerFilter = (() => {
-    return 'Moy ✓'
+    const used = (filter: any, customerProvided: boolean) => !!filter || !!customerProvided
+    const labels: string[] = []
+    if (used(lastServiceData.oilFilter, lastServiceData.oilFilterCustomerProvided)) labels.push('Moy')
+    if (used(lastServiceData.airFilter, lastServiceData.airFilterCustomerProvided)) labels.push('Havo')
+    if (used(lastServiceData.cabinFilter, lastServiceData.cabinFilterCustomerProvided)) labels.push('Salon')
+    if (used(lastServiceData.fuelFilter, lastServiceData.fuelFilterCustomerProvided)) labels.push("Yonilg'i")
+    return labels.length > 0 ? labels.join(', ') : null
   })()
   const stickerEmployee =
     lastServiceData.employees?.length > 0
@@ -226,7 +233,7 @@ export function ServicePrintReceipt({
             <div className="mt-1 flex items-end justify-between gap-1">
               <div className="min-w-0 flex-1 space-y-0.5" style={{ fontSize: '3.2mm', lineHeight: 1.05 }}>
                 <div className="truncate">Moy: {stickerOil}</div>
-                <div className="truncate">Filterlar: {stickerFilter}</div>
+                {stickerFilter && <div className="truncate">Filterlar: {stickerFilter}</div>}
                 <div className="truncate">Xodim: {stickerEmployee}</div>
               </div>
               <div

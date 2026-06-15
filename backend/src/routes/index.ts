@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import authRoutes from './authRoutes';
+import financeRoutes from './financeRoutes';
 import vehicleRoutes from './vehicleRoutes';
 import inventoryRoutes from './inventoryRoutes';
 import oilChangeRoutes from './oilChangeRoutes';
@@ -38,5 +39,6 @@ router.use('/employee-payments', employeePaymentRoutes);
 router.use('/roles', roleRoutes);
 router.use('/tenant-users', tenantUserRoutes);
 router.use('/public', publicRoutes);
+router.use('/finance', financeRoutes);
 
 export default router;

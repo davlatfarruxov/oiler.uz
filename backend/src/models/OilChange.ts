@@ -48,6 +48,12 @@ export interface IOilChangeDocument extends Document {
   fuelFilter?: mongoose.Types.ObjectId;
   fuelFilterCustomerProvided: boolean;
   fuelFilterCustomerProvidedDetails?: string;
+  // Price snapshots at time of service (to preserve historical prices)
+  oilProductPriceAtService?: number;
+  oilFilterPriceAtService?: number;
+  airFilterPriceAtService?: number;
+  cabinFilterPriceAtService?: number;
+  fuelFilterPriceAtService?: number;
   additionalProducts: IAdditionalProduct[];
   customProducts: ICustomProduct[];
   mileage: number;
@@ -240,6 +246,12 @@ const oilChangeSchema = new Schema<IOilChangeDocument>(
       type: String,
       trim: true
     },
+    // Price snapshots at time of service
+    oilProductPriceAtService: { type: Number, min: 0 },
+    oilFilterPriceAtService: { type: Number, min: 0 },
+    airFilterPriceAtService: { type: Number, min: 0 },
+    cabinFilterPriceAtService: { type: Number, min: 0 },
+    fuelFilterPriceAtService: { type: Number, min: 0 },
     additionalProducts: [additionalProductSchema],
     customProducts: {
       type: [customProductSchema],

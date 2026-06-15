@@ -88,38 +88,49 @@ export function UnifiedServiceHistory({
   const formatOilChangeItems = (item: UnifiedHistoryItem): Array<{ label: string; amount?: number }> => {
     const items: Array<{ label: string; amount?: number }> = []
 
-    console.log('Oil change item:', item) // Debug log
-
     if (item.oilProduct) {
       const oilName = item.oilProduct.displayName || item.oilProduct.brand || 'Moy'
       const oilQty = Number((item as any).oilQuantityUsed) || 0
-      const oilVolume = Number(item.oilProduct.volume) || 0
-      const oilPrice = Number(item.oilProduct.price) || 0
-      const oilAmount = oilVolume > 0 ? (oilPrice / oilVolume) * oilQty : oilPrice * oilQty
+      // Use snapshot price if available (saved at time of service), else fall back to current price
+      const snapshot = Number((item as any).oilProductPriceAtService)
+      let oilAmount: number
+      if (snapshot > 0) {
+        oilAmount = snapshot
+      } else {
+        const oilVolume = Number(item.oilProduct.volume) || 0
+        const oilPrice = Number(item.oilProduct.price) || 0
+        oilAmount = oilQty > 0 && oilVolume > 0
+          ? Math.round((oilPrice / oilVolume) * oilQty)
+          : oilPrice
+      }
       items.push({ label: `Moy: ${oilName}${oilQty > 0 ? ` (${oilQty}L)` : ''}`, amount: oilAmount > 0 ? oilAmount : undefined })
     }
     if (item.oilFilter) {
+      const snap = Number((item as any).oilFilterPriceAtService)
       items.push({
         label: `Moy filteri: ${item.oilFilter.displayName || item.oilFilter.name || '—'}`,
-        amount: Number(item.oilFilter.price) || undefined
+        amount: snap > 0 ? snap : (Number(item.oilFilter.price) || undefined)
       })
     }
     if (item.airFilter) {
+      const snap = Number((item as any).airFilterPriceAtService)
       items.push({
         label: `Havo filteri: ${item.airFilter.displayName || item.airFilter.name || '—'}`,
-        amount: Number(item.airFilter.price) || undefined
+        amount: snap > 0 ? snap : (Number(item.airFilter.price) || undefined)
       })
     }
     if (item.cabinFilter) {
+      const snap = Number((item as any).cabinFilterPriceAtService)
       items.push({
         label: `Salon filteri: ${item.cabinFilter.displayName || item.cabinFilter.name || '—'}`,
-        amount: Number(item.cabinFilter.price) || undefined
+        amount: snap > 0 ? snap : (Number(item.cabinFilter.price) || undefined)
       })
     }
     if (item.fuelFilter) {
+      const snap = Number((item as any).fuelFilterPriceAtService)
       items.push({
         label: `Yoqilg'i filteri: ${item.fuelFilter.displayName || item.fuelFilter.name || '—'}`,
-        amount: Number(item.fuelFilter.price) || undefined
+        amount: snap > 0 ? snap : (Number(item.fuelFilter.price) || undefined)
       })
     }
 
@@ -138,6 +149,11 @@ export function UnifiedServiceHistory({
         amount: Number(cp?.price) || undefined
       })
     })
+
+    const laborCost = Number((item as any).laborCost)
+    if (laborCost > 0) {
+      items.push({ label: 'Ish haqi', amount: laborCost })
+    }
 
     return items
   }

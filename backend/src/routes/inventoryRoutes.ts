@@ -63,4 +63,11 @@ router.delete(
   inventoryController.deleteItem.bind(inventoryController)
 );
 
+// Bulk import items from Excel (Admin/SuperAdmin/Employee)
+router.post(
+  '/bulk-import',
+  authorize([UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.SUPER_ADMIN]),
+  inventoryController.bulkImport.bind(inventoryController)
+);
+
 export default router;

@@ -124,8 +124,10 @@ export class PaymentController {
     try {
       const tenantId = req.user!.tenantId;
       const { customerId } = req.params;
+      // Ixtiyoriy: ?vehicleId= berilsa, qarz faqat shu mashina bo'yicha hisoblanadi
+      const vehicleId = typeof req.query.vehicleId === 'string' ? req.query.vehicleId : undefined;
 
-      const summary = await paymentService.getCustomerPaymentSummary(tenantId, customerId);
+      const summary = await paymentService.getCustomerPaymentSummary(tenantId, customerId, vehicleId);
       
       res.status(200).json(ApiResponse.success('Payment summary retrieved', summary));
     } catch (error) {

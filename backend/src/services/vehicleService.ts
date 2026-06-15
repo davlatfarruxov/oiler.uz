@@ -11,7 +11,7 @@ interface CreateVehicleData {
   plateNumber: string;
   brand: string;
   vehicleModel: string; // Renamed from 'model'
-  engineType: EngineType;
+  engineType?: EngineType; // Ixtiyoriy — formadan olib tashlandi, default: petrol
   customerName: string;
   customerPhone: string;
 }
@@ -561,13 +561,23 @@ export class VehicleService {
         type: 'oilChange',
         date: change.createdAt,
         serviceName: 'Oil Change',
-        status: change.status, // Add status field
-        completedAt: change.completedAt, // Add completedAt field
+        status: change.status,
+        completedAt: change.completedAt,
         oilProduct: oilProductDisplay,
         oilFilter: formatFilter(change.oilFilter),
         airFilter: formatFilter(change.airFilter),
         cabinFilter: formatFilter(change.cabinFilter),
         fuelFilter: formatFilter(change.fuelFilter),
+        // Price snapshots at time of service
+        oilProductPriceAtService: change.oilProductPriceAtService,
+        oilFilterPriceAtService: change.oilFilterPriceAtService,
+        airFilterPriceAtService: change.airFilterPriceAtService,
+        cabinFilterPriceAtService: change.cabinFilterPriceAtService,
+        fuelFilterPriceAtService: change.fuelFilterPriceAtService,
+        oilQuantityUsed: change.oilQuantityUsed,
+        laborCost: change.laborCost,
+        additionalProducts: change.additionalProducts || [],
+        customProducts: change.customProducts || [],
         items: this.formatOilChangeItems(change),
         price: change.price,
         paymentStatus: change.paymentStatus,

@@ -42,7 +42,7 @@ const vehicleSchema = new Schema<IVehicleDocument>(
     engineType: {
       type: String,
       enum: Object.values(EngineType),
-      required: [true, 'Engine type is required']
+      default: EngineType.PETROL
     },
     customer: {
       type: Schema.Types.ObjectId,

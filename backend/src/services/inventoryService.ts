@@ -113,4 +113,31 @@ export class InventoryService {
   async checkAndGetLowStockAlerts(tenantId: string): Promise<IInventoryDocument[]> {
     return this.getLowStockItems(tenantId);
   }
+
+  async bulkImport(tenantId: string, rows: CreateInventoryData[]): Promise<{ created: number; skipped: number; errors: { row: number; name: string; reason: string }[] }> {
+    let created = 0;
+    let skipped = 0;
+    const errors: { row: number; name: string; reason: string }[] = [];
+
+    for (let i = 0; i < rows.length; i++) {
+      const data = rows[i];
+      try {
+        const existing = await Inventory.findOne({
+          tenant: tenantId,
+          name: { $regex: new RegExp(`^${data.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') },
+          productType: data.productType,
+        });
+        if (existing) {
+          skipped++;
+          continue;
+        }
+        await Inventory.create({ tenant: tenantId, ...data });
+        created++;
+      } catch {
+        errors.push({ row: i + 2, name: data.name, reason: 'Saqlashda xatolik' });
+      }
+    }
+
+    return { created, skipped, errors };
+  }
 }
