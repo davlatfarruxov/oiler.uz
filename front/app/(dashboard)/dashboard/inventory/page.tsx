@@ -1109,6 +1109,14 @@ export default function InventoryPage() {
                   items={filteredProducts}
                   onEdit={openEditDialog}
                   onDelete={handleDeleteItem}
+                  onPrintLabel={(item: any) => {
+                    setSelectedProduct({
+                      type: 'product',
+                      name: item.name,
+                      price: item.price
+                    })
+                    setShowPriceLabel(true)
+                  }}
                   showReorderLevel={true}
                   usdToUzsRate={Number(settings?.exchangeRate) > 0 ? Number(settings.exchangeRate) : 12500}
                 />
@@ -1636,6 +1644,7 @@ function InventoryTable({
   items,
   onEdit,
   onDelete,
+  onPrintLabel,
   showReorderLevel = true,
   usdToUzsRate = 12500
 }: any) {
@@ -1710,13 +1719,25 @@ function InventoryTable({
                   </Badge>
                 )}
               </td>
-              <td className="py-3 px-4 space-x-2">
-                <Button variant="ghost" size="sm" onClick={() => onEdit(item)}>
-                  Edit
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => onDelete(item._id)} className="text-destructive">
-                  Delete
-                </Button>
+              <td className="py-3 px-4">
+                <div className="flex gap-1">
+                  {onPrintLabel && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => onPrintLabel(item)}
+                      title="Print Price Label"
+                    >
+                      <Printer className="w-3 h-3" />
+                    </Button>
+                  )}
+                  <Button variant="ghost" size="sm" onClick={() => onEdit(item)}>
+                    Edit
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => onDelete(item._id)} className="text-destructive">
+                    Delete
+                  </Button>
+                </div>
               </td>
             </tr>
           ))}
